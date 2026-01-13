@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Users, Activity, Eye, Download, Calendar } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
-import axios from 'axios';
+import { apiClient } from '@/services/api';
 
 export const AdminAnalytics: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('7d');
@@ -14,15 +14,16 @@ export const AdminAnalytics: React.FC = () => {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      axios.get('/api/admin/users'),
-      axios.get('/api/admin/transactions')
+      apiClient.get('/admin/users'),
+      apiClient.get('/admin/transactions')
     ])
       .then(([usersRes, txRes]) => {
-        setUserStats(usersRes.data.data || []);
+        setUserStats(usersRes.data.data?.users || usersRes.data.data || []);
         setRevenueStats(txRes.data.data || []);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Erreur Analytics:', err);
         setError('Erreur lors du chargement des statistiques');
         setLoading(false);
       });

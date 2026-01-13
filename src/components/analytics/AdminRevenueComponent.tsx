@@ -103,9 +103,12 @@ const AdminRevenueComponent: React.FC<AdminRevenueComponentProps> = () => {
 
   const loadPlatformStats = async () => {
     try {
-      const response = await fetch('/api/admin/platform-wallet', {
+      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      
+      const response = await fetch(`${API_URL}/admin/platform-wallet`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         }
       });
       

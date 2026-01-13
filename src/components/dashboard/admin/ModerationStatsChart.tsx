@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
-import axios from 'axios';
+import { apiClient } from '@/services/api';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -20,12 +20,13 @@ const ModerationStatsChart: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    axios.get('/api/applications/stats')
+    apiClient.get('/admin/statistics')
       .then(res => {
-        setStats(res.data);
+        setStats(res.data.data);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error('Erreur stats modération:', err);
         setError('Erreur lors du chargement des statistiques');
         setLoading(false);
       });
