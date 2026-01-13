@@ -119,9 +119,10 @@ const PendingRegistrationsComponent: React.FC<PendingRegistrationsComponentProps
 
     setProcessing(true);
     try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       const endpoint = actionType === 'approve' 
-        ? `/api/admin/approve-registration/${selectedUser._id}`
-        : `/api/admin/reject-registration/${selectedUser._id}`;
+        ? `${API_URL}/admin/approve-registration/${selectedUser._id}`
+        : `${API_URL}/admin/reject-registration/${selectedUser._id}`;
 
       const body = actionType === 'approve' 
         ? { comments }
