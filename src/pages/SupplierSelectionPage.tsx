@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
 import { apiClient } from '@/services/api';
+import { useNavigation } from '@/hooks/useNavigation';
 
 interface Supplier {
   _id: string;
@@ -18,6 +19,7 @@ interface Supplier {
 }
 
 const SupplierSelectionPage = () => {
+  const { navigateTo } = useNavigation();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +51,12 @@ const SupplierSelectionPage = () => {
   const handleSupplierSelect = (supplierId: string) => {
     // Sauvegarder l'ID du fournisseur sélectionné
     localStorage.setItem('selectedSupplierId', supplierId);
-    // Rediriger vers la page catalogue
-    window.location.href = `/#supplier-catalog/${supplierId}`;
+    // Naviguer vers la page catalogue (sans recharger la page)
+    navigateTo('supplier-catalog', { supplierId });
   };
 
   const handleBackToDashboard = () => {
-    window.location.href = '/#restaurant-dashboard';
+    navigateTo('restaurant-dashboard');
   };
 
   if (loading) {
