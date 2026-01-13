@@ -81,7 +81,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -100,12 +100,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           </div>
 
           <div className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              {/* Formulaire de connexion classique */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Connexion manuelle</h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Formulaire de connexion classique */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Connectez-vous</h3>
+              <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email
@@ -162,7 +160,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   </button>
                 </form>
               </div>
-            </div>
           </div>
         </motion.div>
       </div>
