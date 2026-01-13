@@ -187,6 +187,13 @@ const CheckoutForm: React.FC<{ onSuccess?: (orderId: string) => void }> = ({ onS
       });
 
       // 2. Créer PaymentIntent côté backend avec apiClient
+      // Fallback: récupérer supplierId depuis localStorage si supplier.id est undefined
+      const supplierId = supplier?.id || localStorage.getItem('selectedSupplierId') || items[0]?.supplierId;
+      
+      if (!supplierId) {
+        throw new Error('Fournisseur non trouvé. Veuillez retourner au catalogue.');
+      }
+      
       const response = await apiClient.post('/payments/create-payment-intent', {
         amount: Math.round(total * 100), // Stripe utilise les centimes
         currency: 'eur',
@@ -198,7 +205,7 @@ const CheckoutForm: React.FC<{ onSuccess?: (orderId: string) => void }> = ({ onS
             price: item.price,
             unit: item.unit,
           })),
-          supplierId: supplier?.id,
+          supplierId: supplierId,
           deliveryAddress: formData.deliveryAddress,
           deliveryDate: formData.deliveryDate,
           deliveryTime: formData.deliveryTime,
