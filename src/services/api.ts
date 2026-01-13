@@ -86,13 +86,9 @@ apiClient.interceptors.response.use(
       // L'utilisateur peut être connecté, juste une API non implémentée
     }
     
-    // Retourner une erreur formatée
-    const errorMessage = error.response?.data?.error || 
-                        error.response?.data?.message || 
-                        error.message || 
-                        'Une erreur est survenue';
-    
-    return Promise.reject(new Error(errorMessage));
+    // ⚠️ IMPORTANT: Rejeter l'erreur complète pour préserver response.data.details
+    // Ne pas créer un nouveau Error qui perdrait les informations
+    return Promise.reject(error);
   }
 );
 
