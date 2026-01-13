@@ -274,9 +274,21 @@ const CheckoutForm: React.FC<{ onSuccess?: (orderId: string) => void }> = ({ onS
           }
         }, 2000);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur paiement:', error);
-      setPaymentError((error as Error).message || 'Erreur lors du paiement');
+      
+      // Extraire le message d'erreur détaillé
+      let errorMessage = 'Erreur lors du paiement';
+      
+      if (error.response?.data?.details) {
+        errorMessage = error.response.data.details;
+      } else if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setPaymentError(errorMessage);
     } finally {
       setIsProcessing(false);
     }
