@@ -194,7 +194,11 @@ export const useRealActivities = () => {
 
         // Activités des livraisons
         if (deliveriesRes?.data) {
-          deliveriesRes.data.forEach((delivery: any) => {
+          const deliveriesData = deliveriesRes.data;
+          const deliveries = Array.isArray(deliveriesData) ? deliveriesData : (deliveriesData?.data || deliveriesData?.deliveries || []);
+          
+          if (Array.isArray(deliveries)) {
+            deliveries.slice(0, 5).forEach((delivery: any) => {
               const statusLabels: Record<string, string> = {
                 'assigned': 'Livreur assigné',
                 'pickup_pending': 'En attente de récupération',
@@ -207,14 +211,19 @@ export const useRealActivities = () => {
                 type: 'delivery',
                 title: statusLabels[delivery.status] || 'Mise à jour livraison',
                 description: `Livraison par ${delivery.driverName || 'livreur'} - Commande #${delivery.orderId?.slice(-6)}`,
-              timestamp: delivery.updatedAt || delivery.createdAt || new Date()
+                timestamp: delivery.updatedAt || delivery.createdAt || new Date()
+              });
             });
-          });
+          }
         }
 
         // Activités des conversations/messages
         if (conversationsRes?.data) {
-          conversationsRes.data.forEach((conversation: any) => {
+          const conversationsData = conversationsRes.data;
+          const conversations = Array.isArray(conversationsData) ? conversationsData : (conversationsData?.data || conversationsData?.conversations || []);
+          
+          if (Array.isArray(conversations)) {
+            conversations.slice(0, 5).forEach((conversation: any) => {
               if (conversation.lastMessage) {
                 allActivities.push({
                   id: `message-${conversation._id}`,
@@ -225,6 +234,7 @@ export const useRealActivities = () => {
                 });
               }
             });
+          }
         }
 
         // Trier par date (plus récent en premier)
