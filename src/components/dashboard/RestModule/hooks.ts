@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { ShoppingCart, Package, FileText, MessageCircle } from 'lucide-react';
+import { apiClient } from '@/services/api';
 
 export const useMainStatCards = () => {
   const [stats, setStats] = useState({
@@ -14,15 +15,14 @@ export const useMainStatCards = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/orders/stats`);
-        const data = await response.json();
+        const response = await apiClient.get('/orders/stats');
         
-        if (data.success) {
+        if (response.data.success) {
           setStats({
-            activeOffers: data.data.total || 0,
-            totalUsers: data.data.completed || 0,
-            revenue: data.data.revenue || 0,
-            growth: data.data.pending || 0
+            activeOffers: response.data.data.total || 0,
+            totalUsers: response.data.data.completed || 0,
+            revenue: response.data.data.revenue || 0,
+            growth: response.data.data.pending || 0
           });
         }
       } catch (error) {
@@ -82,22 +82,10 @@ export const useMainStatsCards = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.warn('No authentication token found');
-          return;
-        }
-
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/restaurant/orders/stats`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const data = await response.json();
+        const response = await apiClient.get('/restaurant/orders/stats');
         
-        if (data.success && data.data) {
-          const stats = data.data;
+        if (response.data.success && response.data.data) {
+          const stats = response.data.data;
           const growth = stats.total > 0 ? Math.round(((stats.delivered / stats.total) * 100)) : 0;
           
           setStatsCards([
@@ -140,7 +128,8 @@ export const useMainStatsCards = () => {
           ]);
         }
       } catch (error) {
-        console.error('Error fetching stats:', error);
+        console.error('❌ Erreur statistiques restaurant:', error);
+        // Garder les valeurs à 0 en cas d'erreur
       }
     };
 
@@ -165,17 +154,11 @@ export const useRealActivities = () => {
   useEffect(() => {
     const fetchActivities = async () => {
       try {
-        const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-        if (!token) return;
-
-        const headers = { 'Authorization': `Bearer ${token}` };
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-        // Récupérer les données en parallèle
+        // Récupérer les données en parallèle avec apiClient
         const [ordersRes, deliveriesRes, conversationsRes] = await Promise.all([
-          fetch(`${baseUrl}/orders`, { headers }).catch(() => null),
-          fetch(`${baseUrl}/tms/deliveries/my-deliveries`, { headers }).catch(() => null),
-          fetch(`${baseUrl}/conversations`, { headers }).catch(() => null)
+          apiClient.get('/orders').catch(() => null),
+          apiClient.get('/tms/deliveries/my-deliveries').catch(() => null),
+          apiClient.get('/conversations').catch(() => null)
         ]);
 
         const allActivities: Array<{
@@ -187,11 +170,9 @@ export const useRealActivities = () => {
         }> = [];
 
         // Activités des commandes
-        if (ordersRes?.ok) {
-          const text = await ordersRes.text();
-          try {
-            const ordersData = JSON.parse(text);
-            const orders = ordersData.orders || ordersData.data || [];
+        if (ordersRes?.data) {
+          const ordersData = ordersRes.data;
+          const orders = ordersData.orders || ordersData.data || [];
             orders.slice(0, 5).forEach((order: any) => {
               const statusLabels: Record<string, string> = {
                 'pending': 'Nouvelle commande en attente',
@@ -209,19 +190,10 @@ export const useRealActivities = () => {
                 timestamp: order.updatedAt || order.createdAt || new Date()
               });
             });
-          } catch (e) {
-            console.error('ordersRes non JSON:', text);
-            throw e;
-          }
         }
 
         // Activités des livraisons
-        if (deliveriesRes?.ok) {
-          const text = await deliveriesRes.text();
-          try {
-            const deliveriesData = JSON.parse(text);
-            const deliveries = deliveriesData.deliveries || [];
-            deliveries.slice(0, 3).forEach((delivery: any) => {
+        if (deliveriesRes?.data) {any) => {
               const statusLabels: Record<string, string> = {
                 'assigned': 'Livreur assigné',
                 'pickup_pending': 'En attente de récupération',
@@ -234,22 +206,13 @@ export const useRealActivities = () => {
                 type: 'delivery',
                 title: statusLabels[delivery.status] || 'Mise à jour livraison',
                 description: `Livraison par ${delivery.driverName || 'livreur'} - Commande #${delivery.orderId?.slice(-6)}`,
-                timestamp: delivery.updatedAt || delivery.createdAt || new Date()
-              });
+              timestamp: delivery.updatedAt || delivery.createdAt || new Date()
             });
-          } catch (e) {
-            console.error('deliveriesRes non JSON:', text);
-            throw e;
-          }
+          });
         }
 
         // Activités des conversations/messages
-        if (conversationsRes?.ok) {
-          const text = await conversationsRes.text();
-          try {
-            const conversationsData = JSON.parse(text);
-            const conversations = conversationsData.data?.conversations || conversationsData.conversations || [];
-            conversations.slice(0, 3).forEach((conversation: any) => {
+        if (conversationsRes?.data) {on: any) => {
               if (conversation.lastMessage) {
                 allActivities.push({
                   id: `message-${conversation._id}`,
@@ -260,10 +223,6 @@ export const useRealActivities = () => {
                 });
               }
             });
-          } catch (e) {
-            console.error('conversationsRes non JSON:', text);
-            throw e;
-          }
         }
 
         // Trier par date (plus récent en premier)

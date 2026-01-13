@@ -82,7 +82,29 @@ class NavigationManagerClass {
    */
   initialize(appStoreGetter: () => AppStore) {
     this.appStoreGetter = appStoreGetter;
+    
+    // Écouter le bouton retour du navigateur
+    window.addEventListener('popstate', this.handleBrowserBack.bind(this));
+    
     console.log('✅ NavigationManager initialized');
+  }
+
+  /**
+   * Gérer le bouton retour du navigateur
+   */
+  private handleBrowserBack(event: PopStateEvent) {
+    console.log('🔙 Bouton retour navigateur détecté', event);
+    
+    // Extraire la page depuis l'URL
+    const path = window.location.pathname.replace(/^\//, '') || 'home';
+    const page = path as PageName;
+    
+    // Mettre à jour l'état de l'application
+    const appStore = this.getAppStore();
+    if (appStore) {
+      appStore.navigateTo(page);
+      this.currentPage = page;
+    }
   }
 
   /**
