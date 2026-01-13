@@ -191,20 +191,18 @@ export const useCartStore = create<CartStore>()(
               return;
             }
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/cart/add`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              },
-              body: JSON.stringify({
-                productId: product.productId,
-                quantity: quantity,
-                supplierId: product.supplierId
-              })
+            // Import dynamique de apiClient pour éviter les dépendances circulaires
+            const { apiClient } = await import('@/services/api');
+            
+            const response = await apiClient.post('/cart/add', {
+              productId: product.productId,
+              quantity: quantity,
+              supplierId: product.supplierId,
+              name: product.name,
+              unitPrice: product.price
             });
 
-            if (response.ok) {
+            if (response.data.success) {
               console.log('✅ Produit synchronisé avec le backend');
             } else {
               console.warn('⚠️ Erreur sync backend, produit gardé en local');

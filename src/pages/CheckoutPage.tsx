@@ -143,6 +143,18 @@ const CheckoutForm: React.FC<{ onSuccess?: (orderId: string) => void }> = ({ onS
     }
   };
 
+  // 🔥 NOUVEAU: Synchroniser formData avec cartStore en temps réel
+  useEffect(() => {
+    setDeliveryDetails({
+      address: formData.deliveryAddress,
+      date: formData.deliveryDate,
+      time: formData.deliveryTime,
+      instructions: formData.specialInstructions,
+      urgency: formData.urgency,
+    });
+  }, [formData.deliveryAddress, formData.deliveryDate, formData.deliveryTime, formData.specialInstructions, formData.urgency, setDeliveryDetails]);
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
