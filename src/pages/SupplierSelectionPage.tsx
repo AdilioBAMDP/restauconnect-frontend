@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
+import { apiClient } from '@/services/api';
 
 interface Supplier {
   _id: string;
   name: string;
+  email: string;
   category?: string;
   rating?: number | string;
   description?: string;
@@ -11,6 +13,8 @@ interface Supplier {
   deliveryTime?: string;
   minimumOrder?: number;
   specialties?: string[];
+  role: string;
+  status: string;
 }
 
 const SupplierSelectionPage = () => {
@@ -21,28 +25,19 @@ const SupplierSelectionPage = () => {
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/partners/by-role/fournisseur`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
+        // Utiliser apiClient pour récupérer TOUS les fournisseurs actifs
+        const response = await apiClient.get('/partners/by-role/fournisseur');
 
-        if (!response.ok) {
-          throw new Error('Erreur lors du chargement des fournisseurs');
-        }
-
-        const data = await response.json();
-        // L'API retourne { success: true, data: [...] }
-        if (data.success) {
-          setSuppliers(data.data || []);
+        if (response.data.success) {
+          const suppliersList = response.data.data || [];
+          console.log('📦 Fournisseurs chargés:', suppliersList.length);
+          setSuppliers(suppliersList);
         } else {
-          throw new Error(data.error || 'Erreur lors du chargement des fournisseurs');
+          throw new Error(response.data.error || 'Erreur lors du chargement des fournisseurs');
         }
-      } catch (err) {
+      } catch (err: any) {
         logger.error('Erreur lors du chargement des fournisseurs', err);
-        setError('Erreur lors du chargement');
+        setError(err.response?.data?.error || 'Erreur lors du chargement');
       } finally {
         setLoading(false);
       }

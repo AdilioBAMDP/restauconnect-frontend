@@ -193,7 +193,8 @@ export const useRealActivities = () => {
         }
 
         // Activités des livraisons
-        if (deliveriesRes?.data) {any) => {
+        if (deliveriesRes?.data) {
+          deliveriesRes.data.forEach((delivery: any) => {
               const statusLabels: Record<string, string> = {
                 'assigned': 'Livreur assigné',
                 'pickup_pending': 'En attente de récupération',
@@ -212,7 +213,8 @@ export const useRealActivities = () => {
         }
 
         // Activités des conversations/messages
-        if (conversationsRes?.data) {on: any) => {
+        if (conversationsRes?.data) {
+          conversationsRes.data.forEach((conversation: any) => {
               if (conversation.lastMessage) {
                 allActivities.push({
                   id: `message-${conversation._id}`,
