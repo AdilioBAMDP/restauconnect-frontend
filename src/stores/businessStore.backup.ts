@@ -1,0 +1,3545 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { FEATURES } from '@/config/features';
+import { apiClient } from '@/services/api';
+
+// Configuration API centralisée
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { 
+  CommunityManagerService, 
+  CommunityManagerCampaign, 
+  CommunityManagerClient, 
+  CommunityManagerStats,
+  CandidatProfile,
+  CandidatJobApplication,
+  JobOffer,
+  SavedJobSearch,
+  CandidatStats,
+  GlobalAnnouncement,
+  AnnouncementConfirmation,
+  AnnouncementInteraction,
+  MessageAttachment,
+  EncryptedMessage,
+  UserRole,
+  BankPartner,
+  LoanOffer,
+  BankConversation,
+  AccountantProfile,
+  AccountingDocument,
+  AccountantConversation,
+  AccountingAlert
+} from '@/types/index';
+
+// Types de données métier
+export interface RestaurantOffer {
+  id: string;
+  type: 'personnel' | 'service' | 'fourniture';
+  title: string;
+  description: string;
+  category: string;
+  urgent: boolean;
+  budget?: string;
+  location: string;
+  requirements: string[];
+  images?: string[];
+  status: 'active' | 'completed' | 'paused';
+  createdAt: string;
+  expiresAt?: string;
+  applicationsCount: number;
+  restaurantId: string;
+}
+
+export interface Professional {
+  id: string;
+  name: string;
+  role: 'artisan' | 'candidat' | 'fournisseur' | 'community_manager' | 'banquier' | 'investisseur' | 'comptable' | 'restaurant' | 'transporteur' | 'auditeur';
+  specialty: string;
+  location: string;
+  rating: number;
+  reviewCount: number;
+  price: string;
+  availability: string;
+  verified: boolean;
+  avatar?: string;
+  badges: string[];
+  description: string;
+  ecoFriendly: boolean;
+  portfolio?: string[];
+  skills: string[];
+  experience: string;
+}
+
+export interface Application {
+  id: string;
+  offerId: string;
+  professionalId: string;
+  message: string;
+  proposedPrice?: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+}
+
+// Interface pour les posts de marketplace
+export interface MarketplacePost {
+  id: string;
+  author: {
+    id: string;
+    name: string;
+    role: UserRole;
+    avatar: string;
+    verified: boolean;
+  };
+  content: string;
+  category: 'annonce' | 'conseil' | 'partenariat' | 'offre' | 'demande' | 'actualite';
+  tags: string[];
+  attachments?: {
+    type: 'image' | 'document' | 'video';
+    url: string;
+    name: string;
+  }[];
+  timestamp: Date;
+  likes: number;
+  comments: number;
+  views: number;
+  isLiked: boolean;
+  isBookmarked: boolean;
+  likedBy: string[]; // IDs des utilisateurs qui ont liké
+  bookmarkedBy: string[]; // IDs des utilisateurs qui ont bookmarké
+  visibility: 'public' | 'professionals' | 'role-specific';
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// Types pour les fournisseurs
+export interface SupplierProduct {
+  id: string;
+  supplierId: string;
+  name: string;
+  category: string;
+  subcategory: string;
+  price: number;
+  priceType: 'unit' | 'kg' | 'lot' | 'service';
+  stock: number;
+  minOrder: number;
+  image?: string;
+  description: string;
+  specifications: Record<string, string>;
+  certifications: string[];
+  availability: 'available' | 'limited' | 'out_of_stock';
+  featured: boolean;
+  views: number;
+  orders: number;
+  rating: number;
+  createdAt: string;
+  lastUpdated: string;
+}
+
+export interface SupplierOrder {
+  id: string;
+  supplierId: string;
+  restaurantId: string;
+  restaurantName: string;
+  items: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[];
+  totalAmount: number;
+  status: 'pending' | 'confirmed' | 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+  orderDate: string;
+  expectedDelivery?: string;
+  actualDelivery?: string;
+  notes?: string;
+}
+
+export interface SupplierClient {
+  id: string;
+  restaurantName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  address: string;
+  totalOrders: number;
+  totalSpent: number;
+  lastOrder: string;
+  status: 'active' | 'inactive' | 'blocked';
+  rating: number;
+}
+
+export interface Message {
+  id: string;
+  fromId: string;
+  toId: string;
+  fromName: string;
+  toName: string;
+  subject: string;
+  content: string;
+  read: boolean;
+  createdAt: string;
+  relatedOfferId?: string;
+}
+
+interface BusinessState {
+  // Données
+  offers: RestaurantOffer[];
+  professionals: Professional[];
+  applications: Application[];
+  messages: Message[];
+  
+  // Données partenaires par catégorie
+  partners: Professional[];
+  
+  // Données fournisseur
+  supplierProducts: SupplierProduct[];
+  supplierOrders: SupplierOrder[];
+  supplierClients: SupplierClient[];
+  
+  // Données Community Manager
+  cmServices: CommunityManagerService[];
+  cmCampaigns: CommunityManagerCampaign[];
+  cmClients: CommunityManagerClient[];
+  cmStats: CommunityManagerStats;
+  
+  // Données Candidat
+  candidatProfile: CandidatProfile;
+  candidatApplications: CandidatJobApplication[];
+  jobOffers: JobOffer[];
+  savedSearches: SavedJobSearch[];
+  candidatStats: CandidatStats;
+  
+  // Stats restaurateur
+  stats: {
+    dailyOrders: number;
+    activeStaff: number;
+    todayReservations: number;
+    averageRating: number;
+    monthlyRevenue: number;
+    pendingApplications: number;
+    unreadMessages: number;
+  };
+  
+  // Stats fournisseur
+  supplierStats: {
+    totalProducts: number;
+    totalOrders: number;
+    totalClients: number;
+    monthlyRevenue: number;
+    averageRating: number;
+    totalViews: number;
+    pendingOrders: number;
+  };
+
+  // Actions pour les offres
+  createOffer: (offer: Omit<RestaurantOffer, 'id' | 'createdAt' | 'applicationsCount'>) => void;
+  updateOffer: (id: string, updates: Partial<RestaurantOffer>) => void;
+  deleteOffer: (id: string) => void;
+  
+  // Actions pour la recherche
+  searchProfessionals: (query: string, filters?: {
+    role?: string;
+    location?: string;
+    urgent?: boolean;
+    ecoFriendly?: boolean;
+  }) => Professional[];
+  
+  // Actions pour les candidatures
+  applyToOffer: (offerId: string, professionalId: string, message: string, proposedPrice?: string) => void;
+  updateApplicationStatus: (applicationId: string, status: Application['status']) => void;
+  
+  // Actions pour les messages
+  sendMessage: (message: Omit<Message, 'id' | 'createdAt' | 'read'>) => void;
+  markMessageAsRead: (messageId: string) => void;
+  
+  // Actions pour les professionnels (Admin CRUD)
+  createProfessional: (professional: Omit<Professional, 'id'>) => void;
+  updateProfessional: (id: string, updates: Partial<Professional>) => void;
+  deleteProfessional: (id: string) => void;
+  toggleProfessionalVerification: (id: string) => void;
+  suspendProfessional: (id: string, reason?: string) => void;
+  
+  // Actions de modération (Admin)
+  approveMessage: (messageId: string) => void;
+  rejectMessage: (messageId: string, reason?: string) => void;
+  validateOffer: (offerId: string) => void;
+  rejectOffer: (offerId: string, reason?: string) => void;
+  flagContent: (type: 'message' | 'offer' | 'professional', id: string, reason: string) => void;
+  
+  // Actions pour les stats
+  updateStats: (stats: Partial<BusinessState['stats']>) => void;
+  
+  // Actions pour les fournisseurs
+  createProduct: (product: Omit<SupplierProduct, 'id' | 'createdAt' | 'lastUpdated'>) => void;
+  updateProduct: (id: string, updates: Partial<SupplierProduct>) => void;
+  deleteProduct: (id: string) => void;
+  updateProductStock: (id: string, stock: number) => void;
+  
+  createOrder: (order: Omit<SupplierOrder, 'id' | 'orderDate'>) => void;
+  updateOrderStatus: (id: string, status: SupplierOrder['status']) => void;
+  
+  addClient: (client: Omit<SupplierClient, 'id'>) => void;
+  updateClient: (id: string, updates: Partial<SupplierClient>) => void;
+  
+  updateSupplierStats: (stats: Partial<BusinessState['supplierStats']>) => void;
+  
+  // Actions Community Manager  
+  createCMService: (service: Omit<CommunityManagerService, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateCMService: (id: string, updates: Partial<CommunityManagerService>) => void;
+  deleteCMService: (id: string) => void;
+  
+  createCMCampaign: (campaign: Omit<CommunityManagerCampaign, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateCMCampaign: (id: string, updates: Partial<CommunityManagerCampaign>) => void;
+  deleteCMCampaign: (id: string) => void;
+  updateCampaignMetrics: (id: string, metrics: Partial<CommunityManagerCampaign['metrics']>) => void;
+  
+  addCMClient: (client: Omit<CommunityManagerClient, 'id'>) => void;
+  updateCMClient: (id: string, updates: Partial<CommunityManagerClient>) => void;
+  
+  updateCMStats: (stats: Partial<CommunityManagerStats>) => void;
+  
+  // Actions Candidat
+  updateCandidatProfile: (profile: Partial<CandidatProfile>) => void;
+  addJobApplication: (application: Omit<CandidatJobApplication, 'id'>) => void;
+  updateJobApplication: (id: string, application: Partial<CandidatJobApplication>) => void;
+  deleteJobApplication: (id: string) => void;
+  addSavedSearch: (search: Omit<SavedJobSearch, 'id'>) => void;
+  updateSavedSearch: (id: string, search: Partial<SavedJobSearch>) => void;
+  deleteSavedSearch: (id: string) => void;
+  updateCandidatStats: (stats: Partial<CandidatStats>) => void;
+  
+  // Données Annonces Globales
+  globalAnnouncements: GlobalAnnouncement[];
+  announcementConfirmations: AnnouncementConfirmation[];
+  announcementInteractions: AnnouncementInteraction[];
+  
+  // Données Marketplace
+  marketplacePosts: MarketplacePost[];
+  
+  // Actions Annonces Globales
+  fetchGlobalAnnouncements: () => Promise<void>;
+  createAnnouncement: (announcement: Omit<GlobalAnnouncement, 'id' | 'createdAt' | 'updatedAt' | 'viewCount' | 'clickCount' | 'contactCount'>) => void;
+  updateAnnouncement: (id: string, announcement: Partial<GlobalAnnouncement>) => void;
+  deleteAnnouncement: (id: string) => void;
+  confirmAnnouncementActive: (id: string, isActive: boolean) => void;
+  recordAnnouncementInteraction: (interaction: Omit<AnnouncementInteraction, 'id' | 'timestamp'>) => void;
+  getAnnouncementsForRole: (userRole: UserRole) => GlobalAnnouncement[];
+  
+  // Actions Marketplace
+  addMarketplacePost: (post: Omit<MarketplacePost, 'id' | 'createdAt' | 'timestamp' | 'likes' | 'comments' | 'views' | 'likedBy' | 'bookmarkedBy'>) => Promise<string>;
+  updateMarketplacePost: (id: string, updates: Partial<MarketplacePost>) => Promise<void>;
+  deleteMarketplacePost: (id: string) => Promise<void>;
+  likeMarketplacePost: (postId: string, userId: string) => Promise<void>;
+  bookmarkMarketplacePost: (postId: string, userId: string) => Promise<void>;
+  getMarketplacePostsByRole: (userRole?: UserRole) => MarketplacePost[];
+  fetchMarketplacePosts: () => Promise<void>;
+
+  // ========== NOUVEAUX MODULES ==========
+  
+  // Module Banques - Données
+  bankPartners: BankPartner[];
+  loanOffers: LoanOffer[];
+  bankConversations: BankConversation[];
+  
+  // Module Banques - Actions
+  getBanksByLocation: (city?: string, region?: string) => BankPartner[];
+  getLoanOffersByType: (type?: LoanOffer['type']) => LoanOffer[];
+  createBankConversation: (bankId: string, subject: string, message: string) => string;
+  sendBankMessage: (conversationId: string, content: string, attachments?: MessageAttachment[]) => string;
+  markBankMessageRead: (conversationId: string, messageId: string) => void;
+  
+  // Module Comptable - Données (Restaurant uniquement)
+  accountantProfile: AccountantProfile | null;
+  accountingDocuments: AccountingDocument[];
+  accountantConversations: AccountantConversation[];
+  accountingAlerts: AccountingAlert[];
+  
+  // Module Comptable - Actions
+  assignAccountant: (accountantData: Partial<AccountantProfile>) => void;
+  createAccountingConversation: (subject: string, message: string, category?: AccountantConversation['category'], priority?: AccountantConversation['priority']) => string;
+  sendAccountingMessage: (conversationId: string, content: string, attachments?: MessageAttachment[]) => string;
+  uploadAccountingDocument: (documentData: Omit<AccountingDocument, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  markAccountingAlertRead: (alertId: string) => void;
+}
+
+export const useBusinessStore = create<BusinessState>()(
+  persist(
+    (set, get) => ({
+      // État initial
+      offers: [
+        {
+          id: '1',
+          type: 'personnel',
+          title: 'Serveur expérimenté recherché',
+          description: 'Nous recherchons un serveur expérimenté pour notre restaurant dans le 11e arrondissement. Expérience en service de qualité requise.',
+          category: 'Service en salle',
+          urgent: true,
+          budget: '1800-2200€/mois',
+          location: 'Paris 11e',
+          requirements: ['Expérience 2+ ans', 'Disponible soirs et weekends', 'Excellente présentation'],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          applicationsCount: 5,
+          restaurantId: 'restaurant-1'
+        },
+        {
+          id: '2',
+          type: 'service',
+          title: 'Plombier urgence - Fuite cuisine',
+          description: 'Fuite importante dans la cuisine principale. Intervention urgente requise aujourd\'hui.',
+          category: 'Plomberie',
+          urgent: true,
+          budget: '200-300€',
+          location: 'Paris 11e',
+          requirements: ['Disponible immédiatement', 'Expérience restauration', 'Assurance pro'],
+          status: 'active',
+          createdAt: new Date().toISOString(),
+          applicationsCount: 3,
+          restaurantId: 'restaurant-1'
+        },
+        {
+          id: '3',
+          type: 'fourniture',
+          title: 'Fournisseur légumes bio',
+          description: 'Recherche fournisseur de légumes bio locaux pour livraisons régulières.',
+          category: 'Alimentation',
+          urgent: false,
+          location: 'Paris et région',
+          requirements: ['Certification bio', 'Livraison 3x/semaine', 'Prix compétitifs'],
+          status: 'active',
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          applicationsCount: 8,
+          restaurantId: 'restaurant-1'
+        }
+      ],
+
+      professionals: [
+        {
+          id: 'pro-1',
+          name: 'Marc Dubois',
+          role: 'artisan',
+          specialty: 'Plombier spécialisé restaurants',
+          location: 'Paris 11e',
+          rating: 4.8,
+          reviewCount: 127,
+          price: '65€/h',
+          availability: 'Disponible maintenant',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Marc+Dubois&background=3b82f6&color=fff&size=100',
+          badges: ['Urgence 2h', 'Pro vérifié', 'Spécialiste resto'],
+          description: '15 ans d\'expérience dans la plomberie pour restaurants. Spécialisé en urgence et maintenance préventive.',
+          ecoFriendly: true,
+          skills: ['Plomberie', 'Sanitaire', 'Urgence', 'Maintenance'],
+          experience: '15 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-2',
+          name: 'Sophie Martin',
+          role: 'community_manager',
+          specialty: 'Expert Instagram restaurants',
+          location: 'Lyon',
+          rating: 4.9,
+          reviewCount: 89,
+          price: '450€/mois',
+          availability: '2 créneaux libres',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Sophie+Martin&background=10b981&color=fff&size=100',
+          badges: ['Top CM', 'Food expert', 'Instagram +50K'],
+          description: 'Community Manager spécialisée food. +50 restaurants accompagnés. Création de contenu et stratégie digitale.',
+          ecoFriendly: false,
+          skills: ['Instagram', 'Facebook', 'TikTok', 'Photographie culinaire'],
+          experience: '5 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-3',
+          name: 'Thomas Leclerc',
+          role: 'candidat',
+          specialty: 'Chef de partie expérimenté',
+          location: 'Paris',
+          rating: 4.6,
+          reviewCount: 45,
+          price: '2400€/mois',
+          availability: 'Disponible immédiatement',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Thomas+Leclerc&background=8b5cf6&color=fff&size=100',
+          badges: ['CDI recherché', '8 ans exp', 'Gastronomie'],
+          description: 'Chef de partie avec 8 ans d\'expérience en cuisine gastronomique. Recherche poste stable en CDI.',
+          ecoFriendly: false,
+          skills: ['Cuisine française', 'Gestion équipe', 'Menu création', 'Hygiène HACCP'],
+          experience: '8 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-4',
+          name: 'BioFresh Distribution',
+          role: 'fournisseur',
+          specialty: 'Légumes bio locaux',
+          location: 'Île-de-France',
+          rating: 4.7,
+          reviewCount: 203,
+          price: 'Sur devis',
+          availability: 'Stock disponible',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=BioFresh+Distribution&background=059669&color=fff&size=100',
+          badges: ['Bio certifié', 'Livraison 24h', 'Local +100km'],
+          description: 'Fournisseur de légumes bio locaux. Producteurs partenaires dans un rayon de 100km. Livraison quotidienne.',
+          ecoFriendly: true,
+          skills: ['Agriculture bio', 'Logistique', 'Traçabilité', 'Conseil nutri'],
+          experience: '12 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-banquier-1',
+          name: 'Jean-Pierre Crédit',
+          role: 'banquier',
+          specialty: 'Financement restaurant et commerce',
+          location: 'Paris La Défense',
+          rating: 4.7,
+          reviewCount: 95,
+          price: 'Gratuit (commissions)',
+          availability: 'Disponible sur RDV',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Jean-Pierre+Credit&background=1e40af&color=fff&size=100',
+          badges: ['Banque partenaire', 'Expert resto', 'Taux préférentiels'],
+          description: 'Conseiller bancaire spécialisé dans le financement de restaurants. 12 ans d\'expérience, taux négociés.',
+          ecoFriendly: false,
+          skills: ['Prêts professionnels', 'Assurances', 'Trésorerie', 'Conseil financier'],
+          experience: '12 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-investisseur-1',
+          name: 'Marie Venture Capital',
+          role: 'investisseur',
+          specialty: 'Investissement restaurants innovants',
+          location: 'Neuilly-sur-Seine',
+          rating: 4.9,
+          reviewCount: 34,
+          price: '50K-500K€',
+          availability: 'Sélectif',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Marie+Venture&background=7c3aed&color=fff&size=100',
+          badges: ['Business Angel', 'Food Tech', 'Accompagnement'],
+          description: 'Investisseuse spécialisée Food Tech. Portfolio de 15 restaurants. Accompagnement stratégique inclus.',
+          ecoFriendly: true,
+          skills: ['Due diligence', 'Stratégie', 'Levée de fonds', 'Mentoring'],
+          experience: '8 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-comptable-1',
+          name: 'François Expert-Comptable',
+          role: 'comptable',
+          specialty: 'Comptabilité restaurants et CHR',
+          location: 'Paris 9e',
+          rating: 4.8,
+          reviewCount: 156,
+          price: '180€/mois',
+          availability: 'Nouveaux clients acceptés',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Francois+Expert&background=dc2626&color=fff&size=100',
+          badges: ['Expert-comptable', 'Spécialiste CHR', 'Déclarations'],
+          description: 'Expert-comptable spécialisé CHR. Gestion complète, optimisation fiscale, conseils de gestion.',
+          ecoFriendly: false,
+          skills: ['Comptabilité', 'Fiscal', 'Social', 'Gestion', 'TVA'],
+          experience: '15 ans',
+          portfolio: []
+        },
+        {
+          id: 'pro-restaurant-1',
+          name: 'Le Gourmet Parisien',
+          role: 'restaurant',
+          specialty: 'Cuisine française traditionnelle',
+          location: 'Paris 5e',
+          rating: 4.6,
+          reviewCount: 284,
+          price: '35-55€',
+          availability: 'Ouvert',
+          verified: true,
+          avatar: 'https://ui-avatars.com/api/?name=Le+Gourmet&background=f59e0b&color=fff&size=100',
+          badges: ['Maître Restaurateur', 'Terrasse', 'Groupes'],
+          description: 'Restaurant traditionnel français. Cuisine maison avec produits de saison. Terrasse 40 places.',
+          ecoFriendly: true,
+          skills: ['Cuisine française', 'Produits locaux', 'Service', 'Événements'],
+          experience: '20 ans',
+          portfolio: []
+        }
+      ],
+
+      // Partenaires fictifs par catégorie (pour système d'annuaire)
+      partners: [
+        // ========== RESTAURANTS ==========
+        {
+          id: 'partner-restaurant-1',
+          name: 'Le Bistrot Gourmand',
+          role: 'restaurant',
+          specialty: 'Cuisine française traditionnelle',
+          location: 'Paris 11e',
+          rating: 4.7,
+          reviewCount: 342,
+          price: '30-50€',
+          availability: 'Ouvert',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=11',
+          badges: ['Maître Restaurateur', 'Terrasse', 'Bio'],
+          description: 'Restaurant familial depuis 1985. Cuisine française traditionnelle avec produits locaux.',
+          ecoFriendly: true,
+          skills: ['Cuisine française', 'Produits locaux', 'Service traiteur'],
+          experience: '38 ans'
+        },
+        {
+          id: 'partner-restaurant-2',
+          name: 'La Table du Chef',
+          role: 'restaurant',
+          specialty: 'Cuisine gastronomique',
+          location: 'Lyon 2e',
+          rating: 4.9,
+          reviewCount: 567,
+          price: '70-120€',
+          availability: 'Réservation requise',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=12',
+          badges: ['1 Étoile Michelin', 'Chef reconnu', 'Cave premium'],
+          description: 'Restaurant gastronomique étoilé. Menu dégustation créatif avec accords mets-vins.',
+          ecoFriendly: true,
+          skills: ['Haute gastronomie', 'Accords mets-vins', 'Menu dégustation'],
+          experience: '15 ans'
+        },
+        {
+          id: 'partner-restaurant-3',
+          name: 'Sushi Master',
+          role: 'restaurant',
+          specialty: 'Cuisine japonaise authentique',
+          location: 'Marseille 6e',
+          rating: 4.6,
+          reviewCount: 289,
+          price: '40-80€',
+          availability: 'Ouvert',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=13',
+          badges: ['Chef japonais', 'Poissons frais', 'Spécialités sashimi'],
+          description: 'Sushi bar authentique tenu par un chef japonais. Poisson ultra-frais livré quotidiennement.',
+          ecoFriendly: false,
+          skills: ['Sushi', 'Sashimi', 'Tempura', 'Cuisine japonaise'],
+          experience: '22 ans'
+        },
+        {
+          id: 'partner-restaurant-4',
+          name: 'Pizza Bella Napoli',
+          role: 'restaurant',
+          specialty: 'Pizzeria napolitaine',
+          location: 'Nice 1er',
+          rating: 4.5,
+          reviewCount: 412,
+          price: '12-25€',
+          availability: 'Ouvert',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=14',
+          badges: ['Four à bois', 'Recette napolitaine', 'Livraison'],
+          description: 'Pizzeria traditionnelle napolitaine. Four à bois, pâte maison, produits italiens importés.',
+          ecoFriendly: true,
+          skills: ['Pizza napolitaine', 'Pasta maison', 'Antipasti'],
+          experience: '12 ans'
+        },
+        {
+          id: 'partner-restaurant-5',
+          name: 'Le Végétal',
+          role: 'restaurant',
+          specialty: 'Cuisine végétarienne & vegan',
+          location: 'Bordeaux 1er',
+          rating: 4.8,
+          reviewCount: 234,
+          price: '18-35€',
+          availability: 'Ouvert',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=15',
+          badges: ['100% végétal', 'Bio', 'Sans gluten'],
+          description: 'Restaurant végétarien et vegan. Cuisine créative avec produits bio et locaux.',
+          ecoFriendly: true,
+          skills: ['Cuisine vegan', 'Sans gluten', 'Bio', 'Local'],
+          experience: '6 ans'
+        },
+
+        // ========== FOURNISSEURS ==========
+        {
+          id: 'partner-fournisseur-1',
+          name: 'BioFresh Distribution',
+          role: 'fournisseur',
+          specialty: 'Fruits et légumes bio',
+          location: 'Rungis',
+          rating: 4.7,
+          reviewCount: 178,
+          price: 'Sur devis',
+          availability: 'Livraison quotidienne',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=21',
+          badges: ['Certification AB', 'Livraison rapide', 'Producteurs locaux'],
+          description: 'Grossiste en fruits et légumes bio. Approvisionnement direct producteurs. Livraison 6j/7.',
+          ecoFriendly: true,
+          skills: ['Fruits bio', 'Légumes bio', 'Logistique', 'Fraîcheur'],
+          experience: '18 ans'
+        },
+        {
+          id: 'partner-fournisseur-2',
+          name: 'Viandes Premium',
+          role: 'fournisseur',
+          specialty: 'Viandes de qualité supérieure',
+          location: 'Lyon',
+          rating: 4.9,
+          reviewCount: 245,
+          price: 'Sur devis',
+          availability: 'Commande 48h',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=22',
+          badges: ['Label Rouge', 'Race à viande', 'Traçabilité'],
+          description: 'Fournisseur de viandes haut de gamme. Bœuf, agneau, volaille Label Rouge. Découpe sur mesure.',
+          ecoFriendly: false,
+          skills: ['Boucherie', 'Découpe', 'Maturation', 'Conseils'],
+          experience: '25 ans'
+        },
+        {
+          id: 'partner-fournisseur-3',
+          name: 'Poissonnerie de la Criée',
+          role: 'fournisseur',
+          specialty: 'Poissons et fruits de mer',
+          location: 'Marseille',
+          rating: 4.8,
+          reviewCount: 198,
+          price: 'Tarif marché',
+          availability: 'Livraison quotidienne',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=23',
+          badges: ['Pêche locale', 'Ultra-frais', 'Traçabilité MSC'],
+          description: 'Poissonnerie en direct de la criée. Poissons et fruits de mer ultra-frais, pêche locale.',
+          ecoFriendly: true,
+          skills: ['Poissons frais', 'Fruits de mer', 'Écaillage', 'Filetage'],
+          experience: '32 ans'
+        },
+        {
+          id: 'partner-fournisseur-4',
+          name: 'Vins & Spiritueux Prestige',
+          role: 'fournisseur',
+          specialty: 'Vins et spiritueux',
+          location: 'Bordeaux',
+          rating: 4.9,
+          reviewCount: 312,
+          price: 'Sur devis',
+          availability: 'Stock permanent',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=24',
+          badges: ['Grands crus', 'Sommelier conseil', 'Livraison France'],
+          description: 'Négociant en vins et spiritueux. Grands crus, vins régionaux, conseils personnalisés.',
+          ecoFriendly: false,
+          skills: ['Vins', 'Spiritueux', 'Conseil', 'Accords mets-vins'],
+          experience: '28 ans'
+        },
+        {
+          id: 'partner-fournisseur-5',
+          name: 'Épicerie Fine du Monde',
+          role: 'fournisseur',
+          specialty: 'Produits d\'épicerie fine',
+          location: 'Paris 3e',
+          rating: 4.6,
+          reviewCount: 156,
+          price: 'Sur devis',
+          availability: 'Commande 24h',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=25',
+          badges: ['Produits rares', 'Import direct', 'Épices du monde'],
+          description: 'Importateur de produits d\'épicerie fine. Épices, huiles, condiments du monde entier.',
+          ecoFriendly: true,
+          skills: ['Épices', 'Huiles', 'Condiments', 'Produits exotiques'],
+          experience: '14 ans'
+        },
+
+        // ========== ARTISANS ==========
+        {
+          id: 'partner-artisan-1',
+          name: 'Jean-Marc Plomberie',
+          role: 'artisan',
+          specialty: 'Plomberie professionnelle',
+          location: 'Paris',
+          rating: 4.8,
+          reviewCount: 234,
+          price: '65€/h',
+          availability: 'Urgence 24/7',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=31',
+          badges: ['Urgence 2h', 'Spécialiste CHR', 'Devis gratuit'],
+          description: 'Plombier spécialisé restaurants. Installation, dépannage, maintenance. Intervention rapide.',
+          ecoFriendly: true,
+          skills: ['Plomberie', 'Sanitaire', 'Chauffage', 'Urgence'],
+          experience: '19 ans'
+        },
+        {
+          id: 'partner-artisan-2',
+          name: 'Électricité Pro Services',
+          role: 'artisan',
+          specialty: 'Installation électrique CHR',
+          location: 'Lyon',
+          rating: 4.7,
+          reviewCount: 189,
+          price: '60€/h',
+          availability: 'Du lundi au samedi',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=32',
+          badges: ['Certifié Qualifelec', 'Conformité normes', 'Dépannage'],
+          description: 'Électricien spécialisé CHR. Installation cuisine pro, mise aux normes, dépannage.',
+          ecoFriendly: false,
+          skills: ['Électricité', 'Tableaux électriques', 'Éclairage', 'Maintenance'],
+          experience: '22 ans'
+        },
+        {
+          id: 'partner-artisan-3',
+          name: 'Froid Expertise',
+          role: 'artisan',
+          specialty: 'Froid commercial et climatisation',
+          location: 'Marseille',
+          rating: 4.9,
+          reviewCount: 276,
+          price: '70€/h',
+          availability: 'Intervention rapide',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=33',
+          badges: ['Spécialiste froid', 'Contrat maintenance', 'Urgence'],
+          description: 'Expert en froid commercial. Installation, réparation, maintenance chambres froides et vitrines.',
+          ecoFriendly: true,
+          skills: ['Chambres froides', 'Climatisation', 'Maintenance', 'Fluides frigorigènes'],
+          experience: '16 ans'
+        },
+        {
+          id: 'partner-artisan-4',
+          name: 'Menuiserie Restaurant',
+          role: 'artisan',
+          specialty: 'Aménagement sur mesure',
+          location: 'Toulouse',
+          rating: 4.6,
+          reviewCount: 143,
+          price: 'Sur devis',
+          availability: 'Rendez-vous sur demande',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=34',
+          badges: ['Sur mesure', 'Bois noble', 'Design'],
+          description: 'Menuisier ébéniste. Aménagement restaurant sur mesure, mobilier, bar, terrasse.',
+          ecoFriendly: true,
+          skills: ['Menuiserie', 'Ébénisterie', 'Design', 'Aménagement'],
+          experience: '24 ans'
+        },
+        {
+          id: 'partner-artisan-5',
+          name: 'Peinture & Décoration Pro',
+          role: 'artisan',
+          specialty: 'Peinture et décoration',
+          location: 'Nice',
+          rating: 4.5,
+          reviewCount: 167,
+          price: '45€/h',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=35',
+          badges: ['Travail soigné', 'Délais respectés', 'Conseils déco'],
+          description: 'Peintre décorateur professionnel. Peinture, papier peint, enduits décoratifs.',
+          ecoFriendly: true,
+          skills: ['Peinture', 'Décoration', 'Enduits', 'Couleurs'],
+          experience: '13 ans'
+        },
+
+        // ========== TRANSPORTEURS ==========
+        {
+          id: 'partner-transporteur-1',
+          name: 'Express Livraison Pro',
+          role: 'transporteur',
+          specialty: 'Livraison express restauration',
+          location: 'Paris & Région',
+          rating: 4.7,
+          reviewCount: 412,
+          price: 'À partir de 15€',
+          availability: '7j/7, 6h-23h',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=41',
+          badges: ['Véhicules frigo', 'Livraison express', 'Suivi temps réel'],
+          description: 'Service de livraison spécialisé restauration. Véhicules frigorifiques, livraison express.',
+          ecoFriendly: true,
+          skills: ['Livraison rapide', 'Chaîne du froid', 'Traçabilité', 'Ponctualité'],
+          experience: '11 ans'
+        },
+        {
+          id: 'partner-transporteur-2',
+          name: 'Logistique Food Service',
+          role: 'transporteur',
+          specialty: 'Transport alimentaire',
+          location: 'Nationale',
+          rating: 4.8,
+          reviewCount: 523,
+          price: 'Sur devis',
+          availability: 'Planning flexible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=42',
+          badges: ['Flotte nationale', 'Température contrôlée', 'Certifié HACCP'],
+          description: 'Transporteur alimentaire national. Respect chaîne du froid, traçabilité complète.',
+          ecoFriendly: false,
+          skills: ['Transport frigo', 'Logistique', 'HACCP', 'National'],
+          experience: '23 ans'
+        },
+        {
+          id: 'partner-transporteur-3',
+          name: 'Coursiers Écologiques',
+          role: 'transporteur',
+          specialty: 'Livraison vélo & électrique',
+          location: 'Grandes villes',
+          rating: 4.6,
+          reviewCount: 298,
+          price: '8-20€',
+          availability: 'Lun-Sam 7h-22h',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=43',
+          badges: ['100% écolo', 'Vélo cargo', 'Rapide en ville'],
+          description: 'Coursiers écologiques à vélo et véhicules électriques. Livraison rapide en centre-ville.',
+          ecoFriendly: true,
+          skills: ['Livraison écolo', 'Vélo cargo', 'Rapidité', 'Centre-ville'],
+          experience: '5 ans'
+        },
+
+        // ========== COMMUNITY MANAGERS ==========
+        {
+          id: 'partner-cm-1',
+          name: 'Digital Food Expert',
+          role: 'community_manager',
+          specialty: 'Social media restaurants',
+          location: 'Remote / Paris',
+          rating: 4.9,
+          reviewCount: 167,
+          price: '550€/mois',
+          availability: '3 créneaux libres',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=51',
+          badges: ['Food expert', 'Instagram +100K', 'Campagnes pub'],
+          description: 'Community Manager spécialisé restauration. Stratégie social media, création contenu, publicités.',
+          ecoFriendly: false,
+          skills: ['Instagram', 'Facebook', 'TikTok', 'Publicités', 'Stratégie digitale'],
+          experience: '7 ans'
+        },
+        {
+          id: 'partner-cm-2',
+          name: 'Content Creator Food',
+          role: 'community_manager',
+          specialty: 'Photo & vidéo culinaire',
+          location: 'Lyon',
+          rating: 4.8,
+          reviewCount: 234,
+          price: '450€/mois',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=52',
+          badges: ['Photographe pro', 'Vidéo', 'TikTok viral'],
+          description: 'Créateur de contenu culinaire. Photo pro, vidéo, reels Instagram/TikTok. Portfolio +50 restos.',
+          ecoFriendly: false,
+          skills: ['Photographie culinaire', 'Vidéo', 'Montage', 'Reels'],
+          experience: '5 ans'
+        },
+        {
+          id: 'partner-cm-3',
+          name: 'Social Media Manager Pro',
+          role: 'community_manager',
+          specialty: 'Gestion complète réseaux sociaux',
+          location: 'Remote',
+          rating: 4.7,
+          reviewCount: 189,
+          price: '650€/mois',
+          availability: '2 créneaux',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=53',
+          badges: ['Multi-plateformes', 'Campagnes ROI', 'Analytics'],
+          description: 'Gestion complète de votre présence digitale. Stratégie, contenu, publicité, reporting.',
+          ecoFriendly: false,
+          skills: ['Stratégie digitale', 'Publicités', 'Analytics', 'Community management'],
+          experience: '9 ans'
+        },
+
+        // ========== BANQUIERS ==========
+        {
+          id: 'partner-banquier-1',
+          name: 'Crédit Pro Restauration',
+          role: 'banquier',
+          specialty: 'Financement professionnel CHR',
+          location: 'Paris',
+          rating: 4.6,
+          reviewCount: 124,
+          price: 'Conseil gratuit',
+          availability: 'Sur rendez-vous',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=61',
+          badges: ['Spécialiste CHR', 'Prêts avantageux', 'Accompagnement'],
+          description: 'Conseiller financier spécialisé CHR. Prêts professionnels, leasing matériel, trésorerie.',
+          ecoFriendly: false,
+          skills: ['Financement', 'Prêts pro', 'Conseil', 'Trésorerie'],
+          experience: '15 ans'
+        },
+        {
+          id: 'partner-banquier-2',
+          name: 'Banque des Entrepreneurs',
+          role: 'banquier',
+          specialty: 'Création & développement entreprise',
+          location: 'Lyon',
+          rating: 4.7,
+          reviewCount: 187,
+          price: 'Gratuit',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=62',
+          badges: ['Start-up friendly', 'Accompagnement', 'Prêts création'],
+          description: 'Banque spécialisée entrepreneurs. Accompagnement création, prêts à taux préférentiels.',
+          ecoFriendly: true,
+          skills: ['Création entreprise', 'Développement', 'Prêts', 'Conseil stratégique'],
+          experience: '20 ans'
+        },
+        {
+          id: 'partner-banquier-3',
+          name: 'Finance & Investissement',
+          role: 'banquier',
+          specialty: 'Investissement et croissance',
+          location: 'Marseille',
+          rating: 4.8,
+          reviewCount: 213,
+          price: 'Sur devis',
+          availability: 'Rendez-vous',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=63',
+          badges: ['Gros projets', 'Investisseurs réseau', 'Expertise'],
+          description: 'Conseiller investissement. Financement projets d\'expansion, mise en relation investisseurs.',
+          ecoFriendly: false,
+          skills: ['Investissement', 'Levée de fonds', 'Stratégie financière', 'Réseau'],
+          experience: '18 ans'
+        },
+
+        // ========== COMPTABLES ==========
+        {
+          id: 'partner-comptable-1',
+          name: 'Expert Comptable CHR',
+          role: 'comptable',
+          specialty: 'Comptabilité restaurants',
+          location: 'Paris',
+          rating: 4.9,
+          reviewCount: 267,
+          price: '200€/mois',
+          availability: 'Nouveaux clients',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=71',
+          badges: ['Expert-comptable', 'Spécialiste CHR', 'TVA restaurant'],
+          description: 'Expert-comptable spécialisé restauration. Gestion complète, optimisation fiscale, conseils.',
+          ecoFriendly: false,
+          skills: ['Comptabilité', 'TVA', 'Fiscal', 'Social', 'Optimisation'],
+          experience: '21 ans'
+        },
+        {
+          id: 'partner-comptable-2',
+          name: 'Compta & Gestion Pro',
+          role: 'comptable',
+          specialty: 'Gestion comptable PME',
+          location: 'Lyon',
+          rating: 4.7,
+          reviewCount: 198,
+          price: '180€/mois',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=72',
+          badges: ['Certifié', 'Déclarations', 'Conseil gestion'],
+          description: 'Cabinet comptable pour PME. Comptabilité, déclarations, bulletins de paie, conseils gestion.',
+          ecoFriendly: false,
+          skills: ['Comptabilité générale', 'Paie', 'Déclarations', 'Gestion'],
+          experience: '14 ans'
+        },
+        {
+          id: 'partner-comptable-3',
+          name: 'Fiscalité & Optimisation',
+          role: 'comptable',
+          specialty: 'Optimisation fiscale',
+          location: 'Bordeaux',
+          rating: 4.8,
+          reviewCount: 176,
+          price: '250€/mois',
+          availability: 'Sur rendez-vous',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=73',
+          badges: ['Optimisation', 'Audit', 'Stratégie fiscale'],
+          description: 'Spécialiste optimisation fiscale. Audit, stratégie fiscale, montages juridiques.',
+          ecoFriendly: false,
+          skills: ['Optimisation fiscale', 'Audit', 'Stratégie', 'Juridique'],
+          experience: '19 ans'
+        },
+
+        // ========== INVESTISSEURS ==========
+        {
+          id: 'partner-investisseur-1',
+          name: 'Business Angels Restauration',
+          role: 'investisseur',
+          specialty: 'Investissement restaurants innovants',
+          location: 'Paris',
+          rating: 4.7,
+          reviewCount: 89,
+          price: '50K-500K€',
+          availability: 'Projets sélectionnés',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=81',
+          badges: ['Business Angel', 'Réseau', 'Accompagnement'],
+          description: 'Business Angel spécialisé restauration. Investissement + accompagnement stratégique.',
+          ecoFriendly: true,
+          skills: ['Investissement', 'Conseil stratégique', 'Réseau', 'Croissance'],
+          experience: '12 ans'
+        },
+        {
+          id: 'partner-investisseur-2',
+          name: 'Fonds d\'Investissement Food',
+          role: 'investisseur',
+          specialty: 'Capital développement food-tech',
+          location: 'Paris',
+          rating: 4.9,
+          reviewCount: 124,
+          price: '100K-2M€',
+          availability: 'Dossiers solides',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=82',
+          badges: ['Fonds investment', 'Food-tech', 'Scaling'],
+          description: 'Fonds d\'investissement food-tech. Capital développement pour restaurants et start-ups food.',
+          ecoFriendly: false,
+          skills: ['Capital développement', 'Due diligence', 'Scaling', 'Exit strategy'],
+          experience: '8 ans'
+        },
+        {
+          id: 'partner-investisseur-3',
+          name: 'Investisseur Privé',
+          role: 'investisseur',
+          specialty: 'Investissement privé CHR',
+          location: 'Lyon',
+          rating: 4.6,
+          reviewCount: 67,
+          price: '20K-200K€',
+          availability: 'Projets prometteurs',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=83',
+          badges: ['Investisseur privé', 'Flexible', 'Partenariat'],
+          description: 'Investisseur privé. Participations minoritaires, accompagnement personnalisé.',
+          ecoFriendly: true,
+          skills: ['Investissement privé', 'Partenariat', 'Conseil', 'Développement'],
+          experience: '16 ans'
+        },
+
+        // ========== AUDITEURS ==========
+        {
+          id: 'partner-auditeur-1',
+          name: 'Audit & Conformité Pro',
+          role: 'auditeur',
+          specialty: 'Audit hygiène et sécurité',
+          location: 'Paris',
+          rating: 4.8,
+          reviewCount: 143,
+          price: '350€/audit',
+          availability: 'Planning 2 semaines',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=91',
+          badges: ['Certifié HACCP', 'Audit complet', 'Recommandations'],
+          description: 'Auditeur spécialisé hygiène alimentaire. Audit HACCP, conformité, plan d\'action.',
+          ecoFriendly: false,
+          skills: ['HACCP', 'Hygiène', 'Sécurité alimentaire', 'Conformité'],
+          experience: '17 ans'
+        },
+        {
+          id: 'partner-auditeur-2',
+          name: 'Consultant Qualité Restauration',
+          role: 'auditeur',
+          specialty: 'Audit qualité et certification',
+          location: 'Lyon',
+          rating: 4.7,
+          reviewCount: 112,
+          price: '450€/jour',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=92',
+          badges: ['Certifications', 'Qualité', 'Formation équipes'],
+          description: 'Consultant qualité. Audit, mise en conformité, certifications (ISO, HACCP, etc.).',
+          ecoFriendly: false,
+          skills: ['Audit qualité', 'Certifications', 'Formation', 'Conformité'],
+          experience: '22 ans'
+        },
+
+        // ========== DEMANDEURS D'EMPLOI ==========
+        {
+          id: 'partner-candidat-1',
+          name: 'Thomas Serveur Pro',
+          role: 'candidat',
+          specialty: 'Serveur expérimenté',
+          location: 'Paris',
+          rating: 4.7,
+          reviewCount: 45,
+          price: '1900-2300€/mois',
+          availability: 'Immédiatement',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=101',
+          badges: ['8 ans d\'expérience', 'Bilingue', 'Service haut de gamme'],
+          description: 'Serveur professionnel avec 8 ans d\'expérience. Bilingue français-anglais. Service gastronomique.',
+          ecoFriendly: false,
+          skills: ['Service en salle', 'Sommellerie', 'Anglais courant', 'Relation client'],
+          experience: '8 ans'
+        },
+        {
+          id: 'partner-candidat-2',
+          name: 'Marie Chef de Partie',
+          role: 'candidat',
+          specialty: 'Chef de partie',
+          location: 'Lyon',
+          rating: 4.8,
+          reviewCount: 38,
+          price: '2100-2600€/mois',
+          availability: 'Préavis 1 mois',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=102',
+          badges: ['CAP Cuisine', '6 ans expérience', 'Pâtisserie'],
+          description: 'Chef de partie polyvalente. Cuisine française et pâtisserie. CAP + 6 ans d\'expérience.',
+          ecoFriendly: false,
+          skills: ['Cuisine française', 'Pâtisserie', 'Gestion stocks', 'Équipe'],
+          experience: '6 ans'
+        },
+        {
+          id: 'partner-candidat-3',
+          name: 'Lucas Barman Mixologue',
+          role: 'candidat',
+          specialty: 'Barman / Mixologue',
+          location: 'Nice',
+          rating: 4.9,
+          reviewCount: 52,
+          price: '1800-2200€/mois',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=103',
+          badges: ['Cocktails signature', 'Barista', 'Créatif'],
+          description: 'Barman mixologue créatif. Cocktails signature, bar à cocktails, formations barista.',
+          ecoFriendly: false,
+          skills: ['Cocktails', 'Bar', 'Café barista', 'Créativité'],
+          experience: '5 ans'
+        },
+        {
+          id: 'partner-candidat-4',
+          name: 'Sophie Commis de Cuisine',
+          role: 'candidat',
+          specialty: 'Commis de cuisine',
+          location: 'Marseille',
+          rating: 4.5,
+          reviewCount: 23,
+          price: '1650-1850€/mois',
+          availability: 'Immédiatement',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=104',
+          badges: ['CAP Cuisine', 'Motivée', 'Apprentissage rapide'],
+          description: 'Commis de cuisine motivée. CAP Cuisine, 2 ans d\'expérience, envie d\'apprendre.',
+          ecoFriendly: false,
+          skills: ['Bases cuisine', 'Préparations', 'Mise en place', 'Équipe'],
+          experience: '2 ans'
+        },
+        {
+          id: 'partner-candidat-5',
+          name: 'Alexandre Plongeur',
+          role: 'candidat',
+          specialty: 'Plongeur / Aide de cuisine',
+          location: 'Toulouse',
+          rating: 4.6,
+          reviewCount: 31,
+          price: '1580-1750€/mois',
+          availability: 'Disponible',
+          verified: true,
+          avatar: 'https://i.pravatar.cc/150?img=105',
+          badges: ['Polyvalent', 'Rigoureux', 'Travailleur'],
+          description: 'Plongeur polyvalent et rigoureux. Expérience en aide de cuisine, nettoyage, hygiène.',
+          ecoFriendly: false,
+          skills: ['Plonge', 'Nettoyage', 'Hygiène', 'Aide cuisine'],
+          experience: '3 ans'
+        }
+      ],
+
+      applications: [
+        {
+          id: 'app-1',
+          offerId: '1',
+          professionalId: 'pro-3',
+          message: 'Bonjour, je suis intéressé par ce poste de serveur. J\'ai 8 ans d\'expérience en restauration gastronomique.',
+          status: 'pending',
+          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'app-2',
+          offerId: '2',
+          professionalId: 'pro-1',
+          message: 'Je peux intervenir dans l\'heure. Plombier spécialisé restaurants avec matériel d\'urgence.',
+          proposedPrice: '250€',
+          status: 'pending',
+          createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'app-3',
+          offerId: '3',
+          professionalId: 'pro-4',
+          message: 'Nous pouvons vous fournir des légumes bio locaux. Devis personnalisé selon vos besoins.',
+          status: 'pending',
+          createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+
+      messages: [
+        {
+          id: 'msg-1',
+          fromId: 'pro-3',
+          toId: 'restaurant-1',
+          fromName: 'Thomas Leclerc',
+          toName: 'Restaurant Le Comptoir',
+          subject: 'Candidature poste serveur',
+          content: 'Bonjour, suite à votre offre, je souhaiterais discuter de mes motivations. Disponible pour un entretien.',
+          read: false,
+          createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+          relatedOfferId: '1'
+        },
+        {
+          id: 'msg-2',
+          fromId: 'pro-1',
+          toId: 'restaurant-1',
+          fromName: 'Marc Dubois',
+          toName: 'Restaurant Le Comptoir',
+          subject: 'Intervention plomberie urgente',
+          content: 'Je peux intervenir dans 30 minutes. Matériel disponible pour réparation immédiate.',
+          read: false,
+          createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+          relatedOfferId: '2'
+        }
+      ],
+
+      stats: {
+        dailyOrders: 47,
+        activeStaff: 8,
+        todayReservations: 23,
+        averageRating: 4.8,
+        monthlyRevenue: 45000,
+        pendingApplications: 5,
+        unreadMessages: 3
+      },
+
+      // Données fournisseur
+      supplierProducts: [
+        {
+          id: '1',
+          supplierId: 'supplier-1',
+          name: 'Légumes Bio Assortis Premium',
+          category: 'Produits Frais',
+          subcategory: 'Légumes Bio',
+          price: 25,
+          priceType: 'kg',
+          stock: 150,
+          minOrder: 5,
+          image: '🥬',
+          description: 'Assortiment de légumes bio de saison cultivés localement. Fraîcheur garantie, livraison quotidienne possible.',
+          specifications: {
+            'Origine': 'Local - Rayon 50km',
+            'Conservation': '2-5°C, 5-7 jours',
+            'Variétés': 'Carottes, Courgettes, Tomates, Salade',
+            'Certification': 'AB Bio France'
+          } as Record<string, string>,
+          certifications: ['Bio', 'Local', 'Éco-responsable', 'Fraîcheur Garantie'],
+          availability: 'available',
+          featured: true,
+          views: 245,
+          orders: 34,
+          rating: 4.8,
+          createdAt: '2024-01-10T10:00:00Z',
+          lastUpdated: '2024-01-15T10:00:00Z'
+        },
+        {
+          id: '2',
+          supplierId: 'supplier-1',
+          name: 'Fourneau Professionnel 6 Feux',
+          category: 'Équipement Cuisine',
+          subcategory: 'Appareils de Cuisson',
+          price: 2500,
+          priceType: 'unit',
+          stock: 5,
+          minOrder: 1,
+          image: '🔥',
+          description: 'Fourneau professionnel 6 feux gaz avec four. Idéal pour restaurant 50-100 couverts.',
+          specifications: {
+            'Puissance': '6 x 3.5 kW + Four 7 kW',
+            'Dimensions': '120 x 80 x 85 cm',
+            'Matériau': 'Inox 304',
+            'Installation': 'Raccordement gaz obligatoire'
+          } as Record<string, string>,
+          certifications: ['CE', 'Garantie Pro 2 ans', 'Installation Incluse'],
+          availability: 'limited',
+          featured: true,
+          views: 128,
+          orders: 8,
+          rating: 4.9,
+          createdAt: '2024-01-08T14:00:00Z',
+          lastUpdated: '2024-01-14T16:00:00Z'
+        },
+        {
+          id: '3',
+          supplierId: 'supplier-1',
+          name: 'Viande Premium Bœuf Local',
+          category: 'Produits Frais',
+          subcategory: 'Viandes',
+          price: 35,
+          priceType: 'kg',
+          stock: 80,
+          minOrder: 2,
+          image: '🥩',
+          description: 'Viande de bœuf local, élevage traditionnel. Traçabilité complète de la ferme à l\'assiette.',
+          specifications: {
+            'Race': 'Charolaise et Limousine',
+            'Élevage': 'Pâturage libre, alimentation naturelle',
+            'Maturation': '21 jours minimum',
+            'Découpe': 'Sur mesure selon besoins'
+          } as Record<string, string>,
+          certifications: ['Label Rouge', 'Origine France', 'Traçabilité'],
+          availability: 'available',
+          featured: true,
+          views: 312,
+          orders: 28,
+          rating: 4.9,
+          createdAt: '2024-01-05T09:00:00Z',
+          lastUpdated: '2024-01-15T11:00:00Z'
+        }
+      ],
+
+      supplierOrders: [
+        {
+          id: '1',
+          supplierId: 'supplier-1',
+          restaurantId: 'rest-1',
+          restaurantName: 'Restaurant Le Gourmet',
+          items: [
+            {
+              productId: '1',
+              productName: 'Légumes Bio Assortis Premium',
+              quantity: 10,
+              unitPrice: 25,
+              total: 250
+            },
+            {
+              productId: '3',  
+              productName: 'Viande Premium Bœuf Local',
+              quantity: 15,
+              unitPrice: 35,
+              total: 525
+            }
+          ],
+          totalAmount: 775,
+          status: 'preparing',
+          orderDate: '2024-01-15T08:30:00Z',
+          expectedDelivery: '2024-01-16T10:00:00Z',
+          notes: 'Livraison impérative avant 10h pour le service midi'
+        },
+        {
+          id: '2',
+          supplierId: 'supplier-1',
+          restaurantId: 'rest-2',
+          restaurantName: 'Bistrot du Coin',
+          items: [
+            {
+              productId: '1',
+              productName: 'Légumes Bio Assortis Premium',
+              quantity: 8,
+              unitPrice: 25,
+              total: 200
+            }
+          ],
+          totalAmount: 200,
+          status: 'confirmed',
+          orderDate: '2024-01-14T15:45:00Z',
+          expectedDelivery: '2024-01-15T14:00:00Z'
+        }
+      ],
+
+      supplierClients: [
+        {
+          id: '1',
+          restaurantName: 'Restaurant Le Gourmet',
+          contactName: 'Marie Dubois',
+          email: 'marie@legourmet.fr',
+          phone: '01 23 45 67 89',
+          address: '15 rue de la Paix, 75001 Paris',
+          totalOrders: 12,
+          totalSpent: 4580,
+          lastOrder: '2024-01-15T08:30:00Z',
+          status: 'active',
+          rating: 4.9
+        },
+        {
+          id: '2',
+          restaurantName: 'Bistrot du Coin',
+          contactName: 'Jean Martin',
+          email: 'contact@bistrotducoin.fr',
+          phone: '01 98 76 54 32',
+          address: '32 avenue des Champs, 75008 Paris',
+          totalOrders: 8,
+          totalSpent: 2140,
+          lastOrder: '2024-01-14T15:45:00Z',
+          status: 'active',
+          rating: 4.6
+        }
+      ],
+
+      supplierStats: {
+        totalProducts: 3,
+        totalOrders: 23,
+        totalClients: 8,
+        monthlyRevenue: 12450,
+        averageRating: 4.8,
+        totalViews: 685,
+        pendingOrders: 2
+      },
+
+      // Données Community Manager avec vraies données
+      cmServices: [
+        {
+          id: 'cm-service-1',
+          name: 'Gestion Réseaux Sociaux Premium',
+          category: 'social-media',
+          description: 'Gestion complète de vos réseaux sociaux avec stratégie, contenus créatifs et community management professionnel',
+          price: 899,
+          priceType: 'per-month',
+          duration: '3 mois minimum',
+          deliverables: [
+            '20 posts Instagram/Facebook par mois',
+            '8 stories par semaine',
+            '1 campagne publicitaire mensuelle',
+            'Rapport d\'analytiques mensuel',
+            'Réponses aux commentaires 7j/7'
+          ],
+          features: [
+            'Stratégie de contenu personnalisée',
+            'Création graphique professionnelle',
+            'Hashtags optimisés',
+            'Planification automatique',
+            'Suivi des performances'
+          ],
+          status: 'active',
+          clientsCount: 12,
+          successRate: 94,
+          createdAt: '2024-01-15T10:00:00Z',
+          updatedAt: '2024-01-20T16:30:00Z'
+        },
+        {
+          id: 'cm-service-2',
+          name: 'Campagne Publicitaire Google Ads',
+          category: 'advertising',
+          description: 'Campagnes publicitaires ciblées pour augmenter votre visibilité et attirer plus de clients',
+          price: 450,
+          priceType: 'per-campaign',
+          duration: '1 mois',
+          deliverables: [
+            'Audit concurrentiel',
+            'Création des annonces',
+            'Configuration du ciblage',
+            'Optimisation quotidienne',
+            'Rapport de performance'
+          ],
+          features: [
+            'Ciblage géographique précis',
+            'Mots-clés optimisés',
+            'A/B testing des annonces',
+            'Retargeting avancé',
+            'Budget optimisé'
+          ],
+          status: 'active',
+          clientsCount: 8,
+          successRate: 87,
+          createdAt: '2024-01-10T14:20:00Z',
+          updatedAt: '2024-01-18T11:15:00Z'
+        },
+        {
+          id: 'cm-service-3',
+          name: 'Shooting Photo Professionnel',
+          category: 'photography',
+          description: 'Séance photo professionnelle de vos plats et de votre restaurant pour un contenu visuel de qualité',
+          price: 350,
+          priceType: 'fixed',
+          duration: 'Demi-journée',
+          deliverables: [
+            '50 photos haute résolution',
+            'Retouche professionnelle',
+            '10 photos optimisées réseaux sociaux',
+            'Photos de l\'ambiance du restaurant',
+            'Livraison sous 48h'
+          ],
+          features: [
+            'Équipement professionnel',
+            'Éclairage studio',
+            'Retouche avancée',
+            'Formats multiples',
+            'Droits d\'usage complets'
+          ],
+          status: 'active',
+          clientsCount: 15,
+          successRate: 98,
+          createdAt: '2024-01-05T09:30:00Z',
+          updatedAt: '2024-01-22T13:45:00Z'
+        }
+      ],
+
+      cmCampaigns: [
+        {
+          id: 'cm-campaign-1',
+          restaurantId: 'restaurant-1',
+          restaurantName: 'Le Petit Bistrot',
+          serviceId: 'cm-service-1',
+          serviceName: 'Gestion Réseaux Sociaux Premium',
+          title: 'Lancement Menu Automne 2024',
+          description: 'Campagne de lancement du nouveau menu automnal avec focus sur les produits de saison',
+          status: 'active',
+          startDate: '2024-01-15T00:00:00Z',
+          endDate: '2024-04-15T00:00:00Z',
+          budget: 2700,
+          spent: 1850,
+          objectives: [
+            {
+              type: 'followers',
+              target: 1000,
+              current: 743
+            },
+            {
+              type: 'engagement',
+              target: 85,
+              current: 78
+            },
+            {
+              type: 'bookings',
+              target: 150,
+              current: 98
+            }
+          ],
+          platforms: ['instagram', 'facebook', 'google-ads'],
+          metrics: {
+            impressions: 45670,
+            reach: 23450,
+            engagement: 3567,
+            clicks: 892,
+            conversions: 98,
+            followers: 743,
+            cost_per_click: 2.07,
+            return_on_ad_spend: 3.4
+          },
+          deliverables: [
+            {
+              id: 'deliv-1',
+              type: 'post',
+              title: 'Post Menu Automne - Soupe de Châtaignes',
+              description: 'Photo + texte engageant sur la soupe signature',
+              platform: 'Instagram',
+              status: 'completed',
+              dueDate: '2024-01-18T18:00:00Z',
+              completedAt: '2024-01-18T15:30:00Z',
+              metrics: {
+                likes: 234,
+                comments: 18,
+                shares: 12,
+                views: 2150
+              }
+            },
+            {
+              id: 'deliv-2',
+              type: 'video',
+              title: 'Stories - Behind the scenes cuisine',
+              description: 'Vidéo courte de préparation en cuisine',
+              platform: 'Instagram Stories',
+              status: 'completed',
+              dueDate: '2024-01-20T12:00:00Z',
+              completedAt: '2024-01-20T10:45:00Z',
+              metrics: {
+                likes: 89,
+                comments: 5,
+                shares: 23,
+                views: 1450
+              }
+            },
+            {
+              id: 'deliv-3',
+              type: 'ad',
+              title: 'Publicité Facebook - Réservation Menu',
+              description: 'Campagne publicitaire ciblée réservations',
+              platform: 'Facebook Ads',
+              status: 'in-progress',
+              dueDate: '2024-01-25T10:00:00Z'
+            }
+          ],
+          createdAt: '2024-01-15T10:00:00Z',
+          updatedAt: '2024-01-22T14:20:00Z'
+        },
+        {
+          id: 'cm-campaign-2',
+          restaurantId: 'restaurant-2',
+          restaurantName: 'Chez Mario',
+          serviceId: 'cm-service-2',
+          serviceName: 'Campagne Publicitaire Google Ads',
+          title: 'Augmentation Livraison à Domicile',
+          description: 'Campagne pour promouvoir le service de livraison et attirer de nouveaux clients',
+          status: 'active',
+          startDate: '2024-01-10T00:00:00Z',
+          endDate: '2024-02-10T00:00:00Z',
+          budget: 450,
+          spent: 287,
+          objectives: [
+            {
+              type: 'sales',
+              target: 500,
+              current: 312
+            },
+            {
+              type: 'reach',
+              target: 10000,
+              current: 7850
+            }
+          ],
+          platforms: ['google-ads'],
+          metrics: {
+            impressions: 28450,
+            reach: 7850,
+            engagement: 892,
+            clicks: 445,
+            conversions: 89,
+            followers: 0,
+            cost_per_click: 0.64,
+            return_on_ad_spend: 4.8
+          },
+          deliverables: [
+            {
+              id: 'deliv-4',
+              type: 'ad',
+              title: 'Annonce Google - Livraison Gratuite',
+              description: 'Campagne promotion livraison gratuite > 25€',
+              platform: 'Google Ads',
+              status: 'completed',
+              dueDate: '2024-01-12T08:00:00Z',
+              completedAt: '2024-01-12T07:30:00Z'
+            }
+          ],
+          createdAt: '2024-01-10T14:20:00Z',
+          updatedAt: '2024-01-23T09:15:00Z'
+        }
+      ],
+
+      cmClients: [
+        {
+          id: 'cm-client-1',
+          restaurantId: 'restaurant-1',
+          restaurantName: 'Le Petit Bistrot',
+          contactPerson: 'Jean Dupont',
+          email: 'jean@petitbistrot.fr',
+          phone: '01 42 88 55 77',
+          location: '15 rue de la Paix, 75001 Paris',
+          restaurantType: 'Bistrot traditionnel',
+          activeCampaigns: 2,
+          totalSpent: 4500,
+          contractStartDate: '2024-01-15T00:00:00Z',
+          contractEndDate: '2024-07-15T00:00:00Z',
+          status: 'active',
+          servicesUsed: ['cm-service-1', 'cm-service-3'],
+          satisfactionRating: 4.8,
+          lastActivity: '2024-01-22T16:45:00Z',
+          notes: 'Client très satisfait, demande extension contrat. Excellent taux d\'engagement sur Instagram.'
+        },
+        {
+          id: 'cm-client-2',
+          restaurantId: 'restaurant-2',
+          restaurantName: 'Chez Mario',
+          contactPerson: 'Mario Rossi',
+          email: 'mario@chezmario.fr',
+          phone: '01 45 67 89 12',
+          location: '28 avenue des Italiens, 75009 Paris',
+          restaurantType: 'Pizzeria italienne',
+          activeCampaigns: 1,
+          totalSpent: 1200,
+          contractStartDate: '2024-01-10T00:00:00Z',
+          status: 'active',
+          servicesUsed: ['cm-service-2'],
+          satisfactionRating: 4.5,
+          lastActivity: '2024-01-23T11:20:00Z',
+          notes: 'Très bon ROI sur Google Ads. Intéressé par la gestion réseaux sociaux pour le prochain contrat.'
+        },
+        {
+          id: 'cm-client-3',
+          restaurantId: 'restaurant-3',
+          restaurantName: 'La Table du Chef',
+          contactPerson: 'Sophie Martin',
+          email: 'sophie@latableduchef.fr',
+          phone: '01 56 78 90 23',
+          location: '12 place Vendôme, 75001 Paris',
+          restaurantType: 'Gastronomique',
+          activeCampaigns: 0,
+          totalSpent: 3200,
+          contractStartDate: '2023-11-01T00:00:00Z',
+          contractEndDate: '2024-01-31T00:00:00Z',
+          status: 'completed',
+          servicesUsed: ['cm-service-1', 'cm-service-2', 'cm-service-3'],
+          satisfactionRating: 4.9,
+          lastActivity: '2024-01-20T14:30:00Z',
+          notes: 'Contrat terminé avec excellent retour. Cliente souhaite renouveler pour 6 mois supplémentaires.'
+        }
+      ],
+
+      cmStats: {
+        totalServices: 3,
+        activeServices: 3,
+        totalClients: 8,
+        activeClients: 5,
+        totalCampaigns: 12,
+        activeCampaigns: 7,
+        monthlyRevenue: 8450,
+        averageClientSatisfaction: 4.7,
+        totalReach: 125000,
+        totalEngagement: 9800,
+        conversionRate: 12.8,
+        retentionRate: 85
+      },
+
+      // Données candidat initiales
+      candidatProfile: {
+        id: 'candidat-001',
+        personalInfo: {
+          firstName: 'Alexandre',
+          lastName: 'Dubois',
+          email: 'alexandre.dubois@email.com',
+          phone: '+33 6 12 34 56 78',
+          birthDate: '1992-03-15',
+          nationality: 'Française',
+          address: '45 rue de la République',
+          city: 'Paris',
+          postalCode: '75011'
+        },
+        professionalInfo: {
+          currentStatus: 'seeking',
+          experience: 'expert',
+          yearsExperience: 8,
+          targetPosition: ['Chef de partie', 'Sous-chef', 'Chef de cuisine'],
+          targetSalary: {
+            min: 2200,
+            max: 2800,
+            negotiable: true
+          },
+          availability: {
+            immediateStart: false,
+            startDate: '2024-02-01',
+            workingSchedule: 'full-time',
+            weekends: true,
+            evenings: true
+          }
+        },
+        skills: {
+          technical: ['Cuisine française', 'Gestion d\'équipe', 'HACCP', 'Créativité culinaire', 'Gestion des coûts'],
+          languages: [
+            { name: 'Français', level: 'natif' },
+            { name: 'Anglais', level: 'intermediaire' },
+            { name: 'Espagnol', level: 'debutant' }
+          ],
+          certifications: ['Permis d\'exploitation', 'Formation HACCP'],
+          software: ['Caisse', 'Excel', 'Logiciel de réservation']
+        },
+        preferences: {
+          contractTypes: ['CDI', 'CDD'],
+          locations: ['Paris', 'Région parisienne'],
+          maxDistance: 50,
+          restaurantTypes: ['Gastronomique', 'Brasserie', 'Bistrot'],
+          teamSize: 'medium',
+          workEnvironment: ['cuisine', 'service', 'management']
+        },
+        documents: {
+          cv: 'CV_Alexandre_Dubois_2024.pdf',
+          coverLetter: 'Lettre_motivation_Alexandre.pdf',
+          portfolio: [],
+          references: [
+            {
+              name: 'Jean-Pierre Vigato',
+              position: 'Chef exécutif',
+              company: 'Restaurant Le Meurice',
+              phone: '+33 1 44 58 10 10',
+              email: 'jp.vigato@lemeurice.fr'
+            }
+          ]
+        },
+        statistics: {
+          profileViews: 127,
+          applicationsCount: 8,
+          interviewsCount: 3,
+          successRate: 25,
+          responseRate: 75
+        },
+        createdAt: '2024-01-10T09:00:00Z',
+        updatedAt: '2024-01-20T15:45:00Z'
+      },
+
+      candidatApplications: [
+        {
+          id: 'app-001',
+          candidatId: 'candidat-001',
+          offerId: 'job-001',
+          restaurantId: 'rest-001',
+          restaurantName: 'Le Grand Véfour',
+          position: 'Chef de partie - Restaurant gastronomique',
+          location: 'Paris 1er',
+          appliedDate: '2024-01-18T14:30:00Z',
+          status: 'pending',
+          contractType: 'CDI',
+          message: 'Bonjour, je suis très intéressé par le poste de Chef de partie dans votre restaurant étoilé...',
+          cv: 'CV_Alexandre_Dubois_2024.pdf',
+          coverLetter: 'Lettre_motivation_Alexandre.pdf',
+          priority: 'high',
+          lastUpdate: '2024-01-18T14:30:00Z'
+        },
+        {
+          id: 'app-002',
+          candidatId: 'candidat-001',
+          offerId: 'job-002',
+          restaurantId: 'rest-002',
+          restaurantName: 'Brasserie Lipp',
+          position: 'Sous-chef - Brasserie moderne',
+          location: 'Paris 6ème',
+          appliedDate: '2024-01-16T10:15:00Z',
+          status: 'interview',
+          contractType: 'CDI',
+          salary: '2600-3200€/mois',
+          message: 'Madame, Monsieur, fort de mes 8 années d\'expérience en cuisine...',
+          cv: 'CV_Alexandre_Dubois_2024.pdf',
+          interviewDate: '2024-01-25T15:00:00Z',
+          interviewNotes: 'Entretien avec le chef exécutif et le directeur',
+          priority: 'urgent',
+          lastUpdate: '2024-01-20T11:00:00Z'
+        },
+        {
+          id: 'app-003',
+          candidatId: 'candidat-001',
+          offerId: 'job-003',
+          restaurantId: 'rest-003',
+          restaurantName: 'Restaurant Septime',
+          position: 'Chef de partie - Cuisine moderne',
+          location: 'Paris 11ème',
+          appliedDate: '2024-01-14T16:45:00Z',
+          status: 'rejected',
+          contractType: 'CDI',
+          message: 'Bonjour, votre restaurant étant reconnu pour sa cuisine créative...',
+          cv: 'CV_Alexandre_Dubois_2024.pdf',
+          coverLetter: 'Lettre_motivation_Alexandre.pdf',
+          feedback: 'Profil intéressant mais recherche candidat avec expérience cuisine végétarienne',
+          priority: 'medium',
+          lastUpdate: '2024-01-19T14:20:00Z'
+        }
+      ],
+
+      jobOffers: [
+        {
+          id: 'job-001',
+          restaurantId: 'rest-001',
+          restaurantName: 'Le Grand Véfour',
+          restaurantType: 'Restaurant gastronomique',
+          title: 'Chef de partie - Restaurant gastronomique',
+          position: 'Chef de partie',
+          description: 'Nous recherchons un Chef de partie expérimenté pour rejoindre notre brigade dans un restaurant étoilé au cœur de Paris.',
+          location: 'Paris 1er arrondissement',
+          contractType: 'CDI',
+          salary: {
+            min: 2400,
+            max: 2800,
+            currency: 'EUR',
+            period: 'monthly',
+            negotiable: true
+          },
+          requirements: {
+            experience: 'expert',
+            skills: ['Cuisine française', 'Gestion d\'équipe', 'HACCP', 'Créativité'],
+            languages: ['Français'],
+            certifications: ['HACCP', 'Permis d\'exploitation'],
+            education: 'CAP Cuisine minimum'
+          },
+          conditions: {
+            workingHours: '48h/semaine',
+            schedule: ['mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'],
+            benefits: ['Mutuelle entreprise', 'Tickets restaurant', '5 semaines congés', 'Formation continue'],
+            startDate: '2024-03-01'
+          },
+          contact: {
+            personName: 'Marie Dubois',
+            email: 'recrutement@grandvefour.fr',
+            phone: '+33 1 42 86 87 88'
+          },
+          status: 'active',
+          urgent: false,
+          featured: true,
+          applicationsCount: 12,
+          viewsCount: 89,
+          postedDate: '2024-01-15T09:00:00Z',
+          expiryDate: '2024-02-15T23:59:59Z',
+          tags: ['gastronomique', 'étoilé', 'paris', 'expérience']
+        },
+        {
+          id: 'job-002',
+          restaurantId: 'rest-002',
+          restaurantName: 'Brasserie Lipp',
+          restaurantType: 'Brasserie',
+          title: 'Sous-chef - Brasserie moderne',
+          position: 'Sous-chef',
+          description: 'Brasserie parisienne historique recherche un Sous-chef pour seconder le chef exécutif et manager l\'équipe de cuisine.',
+          location: 'Saint-Germain-des-Prés, Paris 6ème',
+          contractType: 'CDI',
+          salary: {
+            min: 2600,
+            max: 3200,
+            currency: 'EUR',
+            period: 'monthly',
+            negotiable: false
+          },
+          requirements: {
+            experience: 'senior',
+            skills: ['Management', 'Cuisine française', 'Gestion des coûts', 'Organisation'],
+            languages: ['Français'],
+            certifications: ['HACCP'],
+            education: 'CAP Cuisine + formation management'
+          },
+          conditions: {
+            workingHours: '45h/semaine',
+            schedule: ['mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'],
+            benefits: ['Mutuelle et prévoyance', 'Prime de performance', 'Formation et évolution'],
+            startDate: '2024-02-15'
+          },
+          contact: {
+            personName: 'Jean-Pierre Martin',
+            email: 'jp.martin@brasserielipp.fr',
+            phone: '+33 1 45 48 53 91'
+          },
+          status: 'active',
+          urgent: true,
+          featured: false,
+          applicationsCount: 8,
+          viewsCount: 156,
+          postedDate: '2024-01-12T14:00:00Z',
+          expiryDate: '2024-01-30T23:59:59Z',
+          tags: ['sous-chef', 'management', 'brasserie', 'urgent']
+        }
+      ],
+
+      savedSearches: [
+        {
+          id: 'search-001',
+          candidatId: 'candidat-001',
+          name: 'Chef de partie Paris gastronomique',
+          filters: {
+            keywords: 'chef de partie cuisine gastronomique',
+            position: ['Chef de partie'],
+            location: ['Paris', 'Région parisienne'],
+            contractType: ['CDI'],
+            salaryMin: 2200,
+            salaryMax: 3000,
+            experience: 'expert',
+            restaurantType: ['Gastronomique']
+          },
+          alertsEnabled: true,
+          lastChecked: '2024-01-20T08:00:00Z',
+          newOffersCount: 3,
+          createdAt: '2024-01-15T16:30:00Z'
+        },
+        {
+          id: 'search-002',
+          candidatId: 'candidat-001',
+          name: 'Sous-chef brasserie Paris',
+          filters: {
+            keywords: 'sous-chef management',
+            position: ['Sous-chef', 'Chef de cuisine'],
+            location: ['Paris'],
+            contractType: ['CDI', 'CDD'],
+            salaryMin: 2500,
+            salaryMax: 3500,
+            experience: 'senior',
+            restaurantType: ['Brasserie']
+          },
+          alertsEnabled: true,
+          lastChecked: '2024-01-18T08:00:00Z',
+          newOffersCount: 1,
+          createdAt: '2024-01-10T12:00:00Z'
+        }
+      ],
+
+      candidatStats: {
+        totalApplications: 8,
+        pendingApplications: 3,
+        interviewsScheduled: 1,
+        offersReceived: 0,
+        profileViews: 127,
+        searchAlerts: 2,
+        successRate: 25,
+        averageResponseTime: 3.2,
+        lastActivity: '2024-01-20T15:45:00Z',
+        recommendedOffers: 5
+      },
+
+      // Annonces Globales - Chargées depuis MongoDB
+      globalAnnouncements: [],
+
+      announcementConfirmations: [],
+      announcementInteractions: [],
+      
+      // Marketplace Posts - Chargés depuis MongoDB via /api/marketplace/posts
+      marketplacePosts: [],
+
+      // ========== DONNÉES MODULES BANQUES & COMPTABLE ==========
+      
+      // Module Banques - Données réelles
+      bankPartners: [
+        {
+          id: 'bank-001',
+          name: 'BNP Paribas Professionnels',
+          logo: '/logos/bnp-paribas.png',
+          type: 'banque_traditionnelle',
+          location: {
+            city: 'Paris',
+            region: 'Île-de-France',
+            address: '16 Boulevard des Italiens, 75009 Paris',
+            coordinates: [2.3392, 48.8718]
+          },
+          contact: {
+            phone: '01 42 98 12 34',
+            email: 'pro.paris9@bnpparibas.fr',
+            website: 'https://professionnels.bnpparibas.fr',
+            agentName: 'Marie Dupont'
+          },
+          rating: 4.2,
+          reviewCount: 234,
+          specialties: ['Crédit professionnel', 'Financement équipement', 'Crédit trésorerie'],
+          isActive: true,
+          createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'bank-002',
+          name: 'Crédit Mutuel Restauration',
+          logo: '/logos/credit-mutuel.png',
+          type: 'credit_mutuel',
+          location: {
+            city: 'Paris',
+            region: 'Île-de-France',
+            address: '45 Avenue de la République, 75011 Paris',
+            coordinates: [2.3686, 48.8648]
+          },
+          contact: {
+            phone: '01 48 06 78 90',
+            email: 'contact.pro@creditmutuel.fr',
+            website: 'https://pro.creditmutuel.fr',
+            agentName: 'Jean-Pierre Martin'
+          },
+          rating: 4.5,
+          reviewCount: 189,
+          specialties: ['Prêt restauration', 'Leasing équipement', 'Financement travaux'],
+          isActive: true,
+          createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'bank-003',
+          name: 'Banque Populaire Entreprises',
+          logo: '/logos/banque-populaire.png',
+          type: 'banque_populaire',
+          location: {
+            city: 'Paris',
+            region: 'Île-de-France',
+            address: '28 Rue de Rivoli, 75004 Paris',
+            coordinates: [2.3567, 48.8566]
+          },
+          contact: {
+            phone: '01 44 94 56 78',
+            email: 'entreprises@bpop.fr',
+            website: 'https://entreprises.banquepopulaire.fr',
+            agentName: 'Sophie Leroy'
+          },
+          rating: 4.1,
+          reviewCount: 156,
+          specialties: ['Crédit court terme', 'Affacturage', 'Prêt immobilier pro'],
+          isActive: true,
+          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+
+      loanOffers: [
+        {
+          id: 'loan-001',
+          bankId: 'bank-001',
+          bankName: 'BNP Paribas Professionnels',
+          type: 'credit_professionnel',
+          title: 'Crédit Professionnel Restaurant Express',
+          description: 'Financement rapide pour équipement et fonds de roulement. Déblocage sous 48h après accord.',
+          conditions: {
+            minAmount: 5000,
+            maxAmount: 150000,
+            minDuration: 12,
+            maxDuration: 84,
+            interestRateMin: 2.8,
+            interestRateMax: 5.2,
+            processingFee: 200,
+            guaranteeRequired: true,
+            minTurnover: 50000
+          },
+          eligibility: {
+            businessAge: 1,
+            targetSectors: ['Restauration', 'Hôtellerie', 'Traiteur'],
+            creditScoreMin: 650,
+            turnoverMin: 50000
+          },
+          documents: ['Bilans 2 dernières années', 'Relevés bancaires 6 mois', 'Kbis récent', 'Prévisionnels'],
+          processingTime: '48h à 5 jours',
+          advantages: ['Taux préférentiel restauration', 'Déblocage express', 'Report premier remboursement'],
+          status: 'active',
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'loan-002',
+          bankId: 'bank-002',
+          bankName: 'Crédit Mutuel Restauration',
+          type: 'pret_equipement',
+          title: 'Prêt Équipement Cuisine Pro',
+          description: 'Financement spécialisé pour équipement de cuisine professionnelle. Partenariats avec les grands fournisseurs.',
+          conditions: {
+            minAmount: 3000,
+            maxAmount: 80000,
+            minDuration: 24,
+            maxDuration: 60,
+            interestRateMin: 2.1,
+            interestRateMax: 4.8,
+            processingFee: 150,
+            guaranteeRequired: false,
+            minTurnover: 30000
+          },
+          eligibility: {
+            businessAge: 0.5,
+            targetSectors: ['Restauration', 'Boulangerie', 'Pâtisserie'],
+            turnoverMin: 30000
+          },
+          documents: ['Devis équipement', 'Kbis', 'Relevés bancaires 3 mois'],
+          processingTime: '3 à 7 jours',
+          advantages: ['Taux attractif équipement', 'Financement à 100%', 'Maintenance incluse'],
+          status: 'active',
+          validUntil: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+          createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'loan-003',
+          bankId: 'bank-003',
+          bankName: 'Banque Populaire Entreprises',
+          type: 'credit_tresorerie',
+          title: 'Crédit Trésorerie Saisonnalité',
+          description: 'Solution de financement court terme pour faire face aux variations saisonnières.',
+          conditions: {
+            minAmount: 10000,
+            maxAmount: 200000,
+            minDuration: 3,
+            maxDuration: 18,
+            interestRateMin: 3.2,
+            interestRateMax: 6.5,
+            processingFee: 300,
+            guaranteeRequired: true,
+            minTurnover: 100000
+          },
+          eligibility: {
+            businessAge: 2,
+            targetSectors: ['Restauration', 'Tourism', 'Événementiel'],
+            creditScoreMin: 700,
+            turnoverMin: 100000
+          },
+          documents: ['Historique activité 3 ans', 'Prévisionnel saisonnier', 'Garanties'],
+          processingTime: '5 à 10 jours',
+          advantages: ['Utilisation flexible', 'Intérêts sur utilisé uniquement', 'Renouvellement automatique'],
+          status: 'active',
+          createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+
+      bankConversations: [],
+
+      // Module Comptable - Données réelles (Restaurant uniquement)
+      accountantProfile: {
+        id: 'accountant-001',
+        name: 'Claire Moreau',
+        firm: 'Cabinet Moreau & Associés',
+        siret: '48392847291847',
+        expertise: ['tva', 'bilan', 'social', 'fiscalite'],
+        certifications: ['Expert-comptable mémorialiste', 'Commissaire aux comptes'],
+        location: {
+          address: '25 Rue du Commerce, 75015 Paris',
+          city: 'Paris',
+          postalCode: '75015'
+        },
+        contact: {
+          phone: '01 45 67 89 12',
+          email: 'claire.moreau@cabinet-moreau.fr',
+          website: 'https://cabinet-moreau.fr'
+        },
+        rating: 4.7,
+        reviewCount: 89,
+        yearsExperience: 12,
+        specializations: ['Restauration', 'Commerce de détail', 'PME'],
+        isActive: true,
+        createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString()
+      },
+
+      accountingDocuments: [
+        {
+          id: 'doc-001',
+          accountantId: 'accountant-001',
+          userId: 'restaurant-user-001',
+          type: 'declaration_tva',
+          title: 'Déclaration TVA - Septembre 2025',
+          description: 'Déclaration de TVA pour le mois de septembre 2025, à valider et signer.',
+          fileName: 'TVA_Sept2025_Restaurant.pdf',
+          fileSize: 1024000,
+          mimeType: 'application/pdf',
+          isConfidential: true,
+          dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'sent',
+          tags: ['TVA', 'Déclaration', 'Urgent'],
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'doc-002',
+          accountantId: 'accountant-001',
+          userId: 'restaurant-user-001',
+          type: 'bilan',
+          title: 'Bilan Comptable 2024',
+          description: 'Bilan comptable annuel 2024 - Version finale pour approbation.',
+          fileName: 'Bilan_2024_Final.xlsx',
+          fileSize: 2048000,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          isConfidential: true,
+          status: 'reviewed',
+          tags: ['Bilan', 'Annuel', '2024'],
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+
+      accountantConversations: [
+        {
+          id: 'conv-001',
+          accountantId: 'accountant-001',
+          userId: 'restaurant-user-001',
+          subject: 'Questions TVA sur livraisons à domicile',
+          priority: 'medium',
+          category: 'declaration',
+          status: 'active',
+          messages: [
+            {
+              id: 'msg-001',
+              senderId: 'restaurant-user-001',
+              senderName: 'Restaurant Manager',
+              senderType: 'user',
+              content: 'Bonjour Claire, j\'ai une question sur la TVA applicable aux livraisons à domicile. Devons-nous appliquer un taux différent ?',
+              type: 'text',
+              isEncrypted: true,
+              timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+              isRead: true,
+              readAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              id: 'msg-002',
+              senderId: 'accountant-001',
+              senderName: 'Claire Moreau',
+              senderType: 'accountant',
+              content: 'Bonjour, pour les livraisons à domicile, le taux reste inchangé à 10% pour la restauration. Cependant, il faut distinguer les frais de livraison qui sont à 20%.',
+              type: 'text',
+              isEncrypted: true,
+              timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+              isRead: true,
+              readAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+            }
+          ],
+          documents: [],
+          alerts: [],
+          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          lastActivity: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+
+      accountingAlerts: [
+        {
+          id: 'alert-001',
+          type: 'declaration_due',
+          title: 'Déclaration TVA à échéance',
+          message: 'La déclaration de TVA de septembre doit être validée avant le 6 octobre.',
+          severity: 'warning',
+          dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+          isRead: false,
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'alert-002',
+          type: 'document_missing',
+          title: 'Documents manquants bilan',
+          message: 'Il manque les factures fournisseurs de décembre pour finaliser le bilan.',
+          severity: 'info',
+          isRead: false,
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ],
+
+      // ========== ACTIONS MODULES BANQUES & COMPTABLE ==========
+      
+      // Actions Module Banques
+      getBanksByLocation: (city?: string, region?: string) => {
+        const { bankPartners } = get();
+        if (!city && !region) return bankPartners;
+        return bankPartners.filter(bank => 
+          (city && bank.location.city === city) || 
+          (region && bank.location.region === region)
+        );
+      },
+
+      getLoanOffersByType: (type?: LoanOffer['type']) => {
+        const { loanOffers } = get();
+        if (!type) return loanOffers.filter(offer => offer.status === 'active');
+        return loanOffers.filter(offer => offer.type === type && offer.status === 'active');
+      },
+
+      createBankConversation: (bankId: string, subject: string, message: string) => {
+        const conversationId = `conv-bank-${Date.now()}`;
+        const messageId = `msg-${Date.now()}`;
+        
+        const newConversation: BankConversation = {
+          id: conversationId,
+          bankId,
+          userId: 'current-user', // À remplacer par l'ID utilisateur réel
+          subject,
+          status: 'active',
+          messages: [{
+            id: messageId,
+            senderId: 'current-user',
+            senderName: 'Restaurant Manager',
+            senderType: 'user',
+            content: message,
+            type: 'text',
+            isEncrypted: true,
+            timestamp: new Date().toISOString(),
+            isRead: false
+          }],
+          documents: [],
+          loanOfferId: undefined,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString()
+        };
+
+        set(state => ({
+          bankConversations: [...state.bankConversations, newConversation]
+        }));
+
+        return conversationId;
+      },
+
+      sendBankMessage: (conversationId: string, content: string, attachments: MessageAttachment[] = []) => {
+        const messageId = `msg-${Date.now()}`;
+        
+        const newMessage: EncryptedMessage = {
+          id: messageId,
+          senderId: 'current-user',
+          senderName: 'Restaurant Manager',
+          senderType: 'user' as const,
+          content,
+          type: attachments.length > 0 ? 'document' as const : 'text' as const,
+          isEncrypted: true,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+          attachments
+        };
+
+        set(state => ({
+          bankConversations: state.bankConversations.map(conv =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  messages: [...conv.messages, newMessage],
+                  updatedAt: new Date().toISOString(),
+                  lastActivity: new Date().toISOString()
+                }
+              : conv
+          )
+        }));
+
+        return messageId;
+      },
+
+      markBankMessageRead: (conversationId: string, messageId: string) => {
+        set(state => ({
+          bankConversations: state.bankConversations.map(conv =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map(msg =>
+                    msg.id === messageId
+                      ? { ...msg, isRead: true, readAt: new Date().toISOString() }
+                      : msg
+                  )
+                }
+              : conv
+          )
+        }));
+      },
+
+      // Actions Module Comptable (Restaurant uniquement)
+      assignAccountant: (accountantData: Partial<AccountantProfile>) => {
+        set(() => ({
+          accountantProfile: {
+            ...accountantData,
+            isActive: true,
+            createdAt: new Date().toISOString()
+          } as AccountantProfile
+        }));
+      },
+
+      createAccountingConversation: (subject: string, message: string, category: AccountantConversation['category'] = 'general', priority: AccountantConversation['priority'] = 'medium') => {
+        const conversationId = `conv-acc-${Date.now()}`;
+        const messageId = `msg-${Date.now()}`;
+        
+        const newConversation: AccountantConversation = {
+          id: conversationId,
+          accountantId: get().accountantProfile?.id || 'accountant-001',
+          userId: 'current-user',
+          subject,
+          priority,
+          category,
+          status: 'active',
+          messages: [{
+            id: messageId,
+            senderId: 'current-user',
+            senderName: 'Restaurant Manager',
+            senderType: 'user',
+            content: message,
+            type: 'text',
+            isEncrypted: true,
+            timestamp: new Date().toISOString(),
+            isRead: false
+          }],
+          documents: [],
+          alerts: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString()
+        };
+
+        set(state => ({
+          accountantConversations: [...state.accountantConversations, newConversation]
+        }));
+
+        return conversationId;
+      },
+
+      sendAccountingMessage: (conversationId: string, content: string, attachments: MessageAttachment[] = []) => {
+        const messageId = `msg-${Date.now()}`;
+        
+        const newMessage: EncryptedMessage = {
+          id: messageId,
+          senderId: 'current-user',
+          senderName: 'Restaurant Manager',
+          senderType: 'user' as const,
+          content,
+          type: attachments.length > 0 ? 'document' as const : 'text' as const,
+          isEncrypted: true,
+          timestamp: new Date().toISOString(),
+          isRead: false,
+          attachments
+        };
+
+        set(state => ({
+          accountantConversations: state.accountantConversations.map(conv =>
+            conv.id === conversationId
+              ? {
+                  ...conv,
+                  messages: [...conv.messages, newMessage],
+                  updatedAt: new Date().toISOString(),
+                  lastActivity: new Date().toISOString()
+                }
+              : conv
+          )
+        }));
+
+        return messageId;
+      },
+
+      uploadAccountingDocument: (documentData: Omit<AccountingDocument, 'id' | 'createdAt' | 'updatedAt'>) => {
+        const documentId = `doc-${Date.now()}`;
+        
+        const newDocument: AccountingDocument = {
+          ...documentData,
+          id: documentId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+
+        set(state => ({
+          accountingDocuments: [...state.accountingDocuments, newDocument]
+        }));
+
+        return documentId;
+      },
+
+      markAccountingAlertRead: (alertId: string) => {
+        set(state => ({
+          accountingAlerts: state.accountingAlerts.map(alert =>
+            alert.id === alertId ? { ...alert, isRead: true } : alert
+          )
+        }));
+      },
+
+      // Actions principales (existantes)
+      createOffer: (offerData) => {
+        const newOffer: RestaurantOffer = {
+          ...offerData,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          applicationsCount: 0,
+          restaurantId: 'restaurant-1'
+        };
+        set((state) => ({
+          offers: [newOffer, ...state.offers]
+        }));
+      },
+
+      updateOffer: (id, updates) => {
+        set((state) => ({
+          offers: state.offers.map(offer => 
+            offer.id === id ? { ...offer, ...updates } : offer
+          )
+        }));
+      },
+
+      deleteOffer: (id) => {
+        set((state) => ({
+          offers: state.offers.filter(offer => offer.id !== id)
+        }));
+      },
+
+      searchProfessionals: (query, filters = {}) => {
+        const { professionals } = get();
+        let results = professionals;
+
+        if (query) {
+          results = results.filter(pro => 
+            pro.name.toLowerCase().includes(query.toLowerCase()) ||
+            pro.specialty.toLowerCase().includes(query.toLowerCase()) ||
+            pro.skills.some(skill => skill.toLowerCase().includes(query.toLowerCase()))
+          );
+        }
+
+        if (filters.role && filters.role !== 'all') {
+          results = results.filter(pro => pro.role === filters.role);
+        }
+
+        if (filters.location) {
+          results = results.filter(pro => 
+            pro.location.toLowerCase().includes(filters.location!.toLowerCase())
+          );
+        }
+
+        if (filters.urgent) {
+          results = results.filter(pro => 
+            pro.availability.toLowerCase().includes('disponible') ||
+            pro.badges.some(badge => badge.toLowerCase().includes('urgence'))
+          );
+        }
+
+        if (filters.ecoFriendly) {
+          results = results.filter(pro => pro.ecoFriendly);
+        }
+
+        return results.sort((a, b) => b.rating - a.rating);
+      },
+
+      applyToOffer: (offerId, professionalId, message, proposedPrice) => {
+        const newApplication: Application = {
+          id: Date.now().toString(),
+          offerId,
+          professionalId,
+          message,
+          proposedPrice,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
+
+        set((state) => ({
+          applications: [newApplication, ...state.applications],
+          offers: state.offers.map(offer => 
+            offer.id === offerId 
+              ? { ...offer, applicationsCount: offer.applicationsCount + 1 }
+              : offer
+          ),
+          stats: {
+            ...state.stats,
+            pendingApplications: state.stats.pendingApplications + 1
+          }
+        }));
+      },
+
+      updateApplicationStatus: (applicationId, status) => {
+        set((state) => ({
+          applications: state.applications.map(app => 
+            app.id === applicationId ? { ...app, status } : app
+          )
+        }));
+      },
+
+      sendMessage: (messageData) => {
+        const newMessage: Message = {
+          ...messageData,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          read: false
+        };
+
+        set((state) => ({
+          messages: [newMessage, ...state.messages],
+          stats: {
+            ...state.stats,
+            unreadMessages: state.stats.unreadMessages + 1
+          }
+        }));
+      },
+
+      markMessageAsRead: (messageId) => {
+        set((state) => ({
+          messages: state.messages.map(msg => 
+            msg.id === messageId ? { ...msg, read: true } : msg
+          ),
+          stats: {
+            ...state.stats,
+            unreadMessages: Math.max(0, state.stats.unreadMessages - 1)
+          }
+        }));
+      },
+
+      updateStats: (newStats) => {
+        set((state) => ({
+          stats: { ...state.stats, ...newStats }
+        }));
+      },
+
+      // Actions CRUD pour les professionnels (Admin)
+      createProfessional: (professionalData) => {
+        const newProfessional: Professional = {
+          ...professionalData,
+          id: Date.now().toString(),
+        };
+
+        set((state) => ({
+          professionals: [newProfessional, ...state.professionals]
+        }));
+      },
+
+      updateProfessional: (id, updates) => {
+        set((state) => ({
+          professionals: state.professionals.map(pro => 
+            pro.id === id ? { ...pro, ...updates } : pro
+          )
+        }));
+      },
+
+      deleteProfessional: (id) => {
+        set((state) => ({
+          professionals: state.professionals.filter(pro => pro.id !== id),
+          // Supprimer aussi ses candidatures et messages
+          applications: state.applications.filter(app => app.professionalId !== id),
+          messages: state.messages.filter(msg => msg.fromId !== id && msg.toId !== id)
+        }));
+      },
+
+      toggleProfessionalVerification: (id) => {
+        set((state) => ({
+          professionals: state.professionals.map(pro => 
+            pro.id === id ? { ...pro, verified: !pro.verified } : pro
+          )
+        }));
+      },
+
+      suspendProfessional: (id, reason = 'Suspension administrative') => {
+        set((state) => ({
+          professionals: state.professionals.map(pro => 
+            pro.id === id ? { 
+              ...pro, 
+              verified: false,
+              description: `[SUSPENDU: ${reason}] ${pro.description}`
+            } : pro
+          )
+        }));
+      },
+
+      // Actions de modération
+      approveMessage: (messageId) => {
+        set((state) => ({
+          messages: state.messages.map(msg => 
+            msg.id === messageId ? { 
+              ...msg, 
+              content: `[APPROUVÉ] ${msg.content}`
+            } : msg
+          )
+        }));
+      },
+
+      rejectMessage: (messageId) => {
+        set((state) => ({
+          messages: state.messages.filter(msg => msg.id !== messageId)
+        }));
+      },
+
+      validateOffer: (offerId) => {
+        set((state) => ({
+          offers: state.offers.map(offer => 
+            offer.id === offerId ? { 
+              ...offer, 
+              status: 'active' as const,
+              description: `[VALIDÉ] ${offer.description}`
+            } : offer
+          )
+        }));
+      },
+
+      rejectOffer: (offerId, reason = 'Non conforme aux conditions') => {
+        set((state) => ({
+          offers: state.offers.map(offer => 
+            offer.id === offerId ? { 
+              ...offer, 
+              status: 'paused' as const,
+              description: `[REJETÉ: ${reason}] ${offer.description}`
+            } : offer
+          )
+        }));
+      },
+
+      flagContent: (type, id, reason) => {
+        // Dans un vrai système, cela créerait un rapport de modération
+        
+        if (type === 'professional') {
+          set((state) => ({
+            professionals: state.professionals.map(pro => 
+              pro.id === id ? { 
+                ...pro, 
+                description: `[SIGNALÉ: ${reason}] ${pro.description}`
+              } : pro
+            )
+          }));
+        }
+      },
+
+      // Actions pour les fournisseurs
+      createProduct: (productData) => {
+        const newProduct: SupplierProduct = {
+          ...productData,
+          id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          views: 0,
+          orders: 0,
+          rating: 0
+        };
+
+        set((state) => ({
+          supplierProducts: [newProduct, ...state.supplierProducts],
+          supplierStats: {
+            ...state.supplierStats,
+            totalProducts: state.supplierStats.totalProducts + 1
+          }
+        }));
+      },
+
+      updateProduct: (id, updates) => {
+        set((state) => ({
+          supplierProducts: state.supplierProducts.map(product =>
+            product.id === id ? { 
+              ...product, 
+              ...updates, 
+              lastUpdated: new Date().toISOString() 
+            } : product
+          )
+        }));
+      },
+
+      deleteProduct: (id) => {
+        set((state) => ({
+          supplierProducts: state.supplierProducts.filter(product => product.id !== id),
+          supplierStats: {
+            ...state.supplierStats,
+            totalProducts: Math.max(0, state.supplierStats.totalProducts - 1)
+          }
+        }));
+      },
+
+      updateProductStock: (id, stock) => {
+        set((state) => ({
+          supplierProducts: state.supplierProducts.map(product =>
+            product.id === id ? { 
+              ...product, 
+              stock,
+              availability: stock > 0 ? (stock > 10 ? 'available' : 'limited') : 'out_of_stock',
+              lastUpdated: new Date().toISOString() 
+            } : product
+          )
+        }));
+      },
+
+      createOrder: (orderData) => {
+        const newOrder: SupplierOrder = {
+          ...orderData,
+          id: Date.now().toString(),
+          orderDate: new Date().toISOString()
+        };
+
+        set((state) => ({
+          supplierOrders: [newOrder, ...state.supplierOrders],
+          supplierStats: {
+            ...state.supplierStats,
+            totalOrders: state.supplierStats.totalOrders + 1,
+            pendingOrders: state.supplierStats.pendingOrders + 1,
+            monthlyRevenue: state.supplierStats.monthlyRevenue + newOrder.totalAmount
+          }
+        }));
+      },
+
+      updateOrderStatus: (id, status) => {
+        set((state) => {
+          const order = state.supplierOrders.find(o => o.id === id);
+          const wasPending = order?.status === 'pending' || order?.status === 'confirmed';
+          const isNowCompleted = status === 'delivered';
+
+          return {
+            supplierOrders: state.supplierOrders.map(order =>
+              order.id === id ? { ...order, status } : order
+            ),
+            supplierStats: {
+              ...state.supplierStats,
+              pendingOrders: wasPending && isNowCompleted 
+                ? Math.max(0, state.supplierStats.pendingOrders - 1)
+                : state.supplierStats.pendingOrders
+            }
+          };
+        });
+      },
+
+      addClient: (clientData) => {
+        const newClient: SupplierClient = {
+          ...clientData,
+          id: Date.now().toString()
+        };
+
+        set((state) => ({
+          supplierClients: [newClient, ...state.supplierClients],
+          supplierStats: {
+            ...state.supplierStats,
+            totalClients: state.supplierStats.totalClients + 1
+          }
+        }));
+      },
+
+      updateClient: (id, updates) => {
+        set((state) => ({
+          supplierClients: state.supplierClients.map(client =>
+            client.id === id ? { ...client, ...updates } : client
+          )
+        }));
+      },
+
+      updateSupplierStats: (stats) => {
+        set((state) => ({
+          supplierStats: {
+            ...state.supplierStats,
+            ...stats
+          }
+        }));
+      },
+
+      // Actions Community Manager
+      createCMService: (serviceData) => {
+        const newService: CommunityManagerService = {
+          ...serviceData,
+          id: `cm-service-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        set((state) => ({
+          cmServices: [newService, ...state.cmServices],
+          cmStats: {
+            ...state.cmStats,
+            totalServices: state.cmStats.totalServices + 1,
+            activeServices: serviceData.status === 'active' ? state.cmStats.activeServices + 1 : state.cmStats.activeServices
+          }
+        }));
+      },
+
+      updateCMService: (id, updates) => {
+        set((state) => ({
+          cmServices: state.cmServices.map(service =>
+            service.id === id ? { 
+              ...service, 
+              ...updates, 
+              updatedAt: new Date().toISOString() 
+            } : service
+          )
+        }));
+      },
+
+      deleteCMService: (id) => {
+        set((state) => ({
+          cmServices: state.cmServices.filter(service => service.id !== id),
+          cmStats: {
+            ...state.cmStats,
+            totalServices: Math.max(0, state.cmStats.totalServices - 1)
+          }
+        }));
+      },
+
+      createCMCampaign: (campaignData) => {
+        const newCampaign: CommunityManagerCampaign = {
+          ...campaignData,
+          id: `cm-campaign-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        set((state) => ({
+          cmCampaigns: [newCampaign, ...state.cmCampaigns],
+          cmStats: {
+            ...state.cmStats,
+            totalCampaigns: state.cmStats.totalCampaigns + 1,
+            activeCampaigns: campaignData.status === 'active' ? state.cmStats.activeCampaigns + 1 : state.cmStats.activeCampaigns
+          }
+        }));
+      },
+
+      updateCMCampaign: (id, updates) => {
+        set((state) => ({
+          cmCampaigns: state.cmCampaigns.map(campaign =>
+            campaign.id === id ? { 
+              ...campaign, 
+              ...updates, 
+              updatedAt: new Date().toISOString() 
+            } : campaign
+          )
+        }));
+      },
+
+      deleteCMCampaign: (id) => {
+        set((state) => ({
+          cmCampaigns: state.cmCampaigns.filter(campaign => campaign.id !== id),
+          cmStats: {
+            ...state.cmStats,
+            totalCampaigns: Math.max(0, state.cmStats.totalCampaigns - 1)
+          }
+        }));
+      },
+
+      updateCampaignMetrics: (id, metrics) => {
+        set((state) => ({
+          cmCampaigns: state.cmCampaigns.map(campaign =>
+            campaign.id === id ? { 
+              ...campaign, 
+              metrics: { ...campaign.metrics, ...metrics },
+              updatedAt: new Date().toISOString() 
+            } : campaign
+          )
+        }));
+      },
+
+      addCMClient: (clientData) => {
+        const newClient: CommunityManagerClient = {
+          ...clientData,
+          id: `cm-client-${Date.now()}`
+        };
+        set((state) => ({
+          cmClients: [newClient, ...state.cmClients],
+          cmStats: {
+            ...state.cmStats,
+            totalClients: state.cmStats.totalClients + 1,
+            activeClients: clientData.status === 'active' ? state.cmStats.activeClients + 1 : state.cmStats.activeClients
+          }
+        }));
+      },
+
+      updateCMClient: (id, updates) => {
+        set((state) => ({
+          cmClients: state.cmClients.map(client =>
+            client.id === id ? { ...client, ...updates } : client
+          )
+        }));
+      },
+
+      updateCMStats: (stats) => {
+        set((state) => ({
+          cmStats: {
+            ...state.cmStats,
+            ...stats
+          }
+        }));
+      },
+
+      // Actions Candidat
+      updateCandidatProfile: (profile) => {
+        set((state) => ({
+          candidatProfile: {
+            ...state.candidatProfile,
+            ...profile,
+            updatedAt: new Date().toISOString()
+          }
+        }));
+      },
+
+      addJobApplication: (application) => {
+        const newApplication: CandidatJobApplication = {
+          ...application,
+          id: `app-${Date.now()}`,
+          lastUpdate: new Date().toISOString()
+        };
+        
+        set((state) => ({
+          candidatApplications: [...state.candidatApplications, newApplication],
+          candidatStats: {
+            ...state.candidatStats,
+            totalApplications: state.candidatStats.totalApplications + 1,
+            pendingApplications: state.candidatStats.pendingApplications + 1,
+            lastActivity: new Date().toISOString()
+          }
+        }));
+      },
+
+      updateJobApplication: (id, application) => {
+        set((state) => ({
+          candidatApplications: state.candidatApplications.map((app) =>
+            app.id === id
+              ? { ...app, ...application, lastUpdate: new Date().toISOString() }
+              : app
+          )
+        }));
+      },
+
+      deleteJobApplication: (id) => {
+        set((state) => ({
+          candidatApplications: state.candidatApplications.filter((app) => app.id !== id),
+          candidatStats: {
+            ...state.candidatStats,
+            totalApplications: Math.max(0, state.candidatStats.totalApplications - 1),
+            lastActivity: new Date().toISOString()
+          }
+        }));
+      },
+
+      addSavedSearch: (search) => {
+        const newSearch: SavedJobSearch = {
+          ...search,
+          id: `search-${Date.now()}`,
+          createdAt: new Date().toISOString()
+        };
+        
+        set((state) => ({
+          savedSearches: [...state.savedSearches, newSearch],
+          candidatStats: {
+            ...state.candidatStats,
+            searchAlerts: state.candidatStats.searchAlerts + 1,
+            lastActivity: new Date().toISOString()
+          }
+        }));
+      },
+
+      updateSavedSearch: (id, search) => {
+        set((state) => ({
+          savedSearches: state.savedSearches.map((s) =>
+            s.id === id ? { ...s, ...search } : s
+          )
+        }));
+      },
+
+      deleteSavedSearch: (id) => {
+        set((state) => ({
+          savedSearches: state.savedSearches.filter((s) => s.id !== id),
+          candidatStats: {
+            ...state.candidatStats,
+            searchAlerts: Math.max(0, state.candidatStats.searchAlerts - 1),
+            lastActivity: new Date().toISOString()
+          }
+        }));
+      },
+
+      updateCandidatStats: (stats) => {
+        set((state) => ({
+          candidatStats: {
+            ...state.candidatStats,
+            ...stats,
+            lastActivity: new Date().toISOString()
+          }
+        }));
+      },
+
+      // Actions Annonces Globales
+      fetchGlobalAnnouncements: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          console.log('🔍 [fetchAnnouncements] Token présent:', !!token);
+          
+          const response = await fetch('http://localhost:5000/api/announcements', {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          console.log('🔍 [fetchAnnouncements] Status:', response.status);
+          
+          if (!response.ok) {
+            const errorData = await response.text();
+            console.error('❌ [fetchAnnouncements] Erreur:', response.status, errorData);
+            return;
+          }
+
+          const result = await response.json();
+          console.log('✅ [fetchAnnouncements] Résultat:', result.count, 'annonces');
+          
+          if (result.success && result.data) {
+            set({ globalAnnouncements: result.data });
+          }
+        } catch (error) {
+          console.error('❌ [fetchAnnouncements] Exception:', error);
+        }
+      },
+
+      createAnnouncement: (announcementData) => {
+        const newAnnouncement: GlobalAnnouncement = {
+          ...announcementData,
+          id: `ann-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastConfirmedAt: new Date().toISOString(),
+          nextConfirmationDue: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4h
+          viewCount: 0,
+          clickCount: 0,
+          contactCount: 0
+        };
+        
+        set((state) => ({
+          globalAnnouncements: [newAnnouncement, ...state.globalAnnouncements]
+        }));
+      },
+
+      updateAnnouncement: (id, announcementData) => {
+        set((state) => ({
+          globalAnnouncements: state.globalAnnouncements.map((ann) =>
+            ann.id === id 
+              ? { ...ann, ...announcementData, updatedAt: new Date().toISOString() }
+              : ann
+          )
+        }));
+      },
+
+      deleteAnnouncement: (id) => {
+        set((state) => ({
+          globalAnnouncements: state.globalAnnouncements.filter((ann) => ann.id !== id)
+        }));
+      },
+
+      confirmAnnouncementActive: (id, isActive) => {
+        const now = new Date();
+        if (isActive) {
+          // L'annonce reste active, programmer prochaine confirmation dans 4h
+          set((state) => ({
+            globalAnnouncements: state.globalAnnouncements.map((ann) =>
+              ann.id === id 
+                ? {
+                    ...ann,
+                    status: 'active',
+                    lastConfirmedAt: now.toISOString(),
+                    nextConfirmationDue: new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString()
+                  }
+                : ann
+            )
+          }));
+        } else {
+          // Supprimer l'annonce car elle n'est plus d'actualité
+          set((state) => ({
+            globalAnnouncements: state.globalAnnouncements.filter((ann) => ann.id !== id)
+          }));
+        }
+      },
+
+      recordAnnouncementInteraction: (interactionData) => {
+        const newInteraction: AnnouncementInteraction = {
+          ...interactionData,
+          id: `int-${Date.now()}`,
+          timestamp: new Date().toISOString()
+        };
+
+        set((state) => ({
+          announcementInteractions: [newInteraction, ...state.announcementInteractions],
+          globalAnnouncements: state.globalAnnouncements.map((ann) => {
+            if (ann.id === interactionData.announcementId) {
+              const updates: Partial<GlobalAnnouncement> = {};
+              switch (interactionData.type) {
+                case 'view':
+                  updates.viewCount = ann.viewCount + 1;
+                  break;
+                case 'click':
+                  updates.clickCount = ann.clickCount + 1;
+                  break;
+                case 'contact':
+                  updates.contactCount = ann.contactCount + 1;
+                  break;
+              }
+              return { ...ann, ...updates };
+            }
+            return ann;
+          })
+        }));
+      },
+
+      getAnnouncementsForRole: (userRole) => {
+        const state = get();
+        return state.globalAnnouncements.filter((ann) => {
+          // Vérifier si l'annonce est active
+          if (ann.status !== 'active') return false;
+          
+          // Vérifier si l'annonce n'a pas expiré
+          if (ann.expiresAt && new Date(ann.expiresAt) < new Date()) return false;
+          
+          // Vérifier les règles d'exclusion
+          if (ann.excludeRoles && ann.excludeRoles.includes(userRole)) return false;
+          
+          // Vérifier le ciblage
+          if (ann.targetAudience === 'all') return true;
+          if (Array.isArray(ann.targetAudience) && ann.targetAudience.includes(userRole)) return true;
+          
+          return false;
+        }).sort((a, b) => {
+          // Tri par priorité puis par date
+          const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
+          const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+          if (priorityDiff !== 0) return priorityDiff;
+          
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      },
+
+      // ========== ACTIONS MARKETPLACE ==========
+      
+      fetchMarketplacePosts: async () => {
+        try {
+          console.log('🔍 [fetchMarketplace] Chargement des posts...');
+          
+          // Utiliser scoring intelligent si feature flag activé
+          const endpoint = FEATURES.SMART_RANKING 
+            ? '/marketplace/posts/ranked'
+            : '/marketplace/posts';
+          
+          const response = await apiClient.get(endpoint);
+          console.log('✅ [fetchMarketplace] Réponse:', response.data);
+          
+          // L'API retourne { success, data: { posts: [...] } }
+          if (response.data?.success && response.data?.data?.posts) {
+            set({ marketplacePosts: response.data.data.posts });
+            console.log('✅ [fetchMarketplace] Posts chargés:', response.data.data.posts.length);
+          } else {
+            // Format alternatif si l'API retourne directement un tableau
+            set({ marketplacePosts: Array.isArray(response.data) ? response.data : [] });
+          }
+        } catch (error: unknown) {
+          const apiError = error as { response?: { status?: number } };
+          console.error('❌ [fetchMarketplace] Erreur:', apiError);
+          
+          // Erreur 401 = non authentifié, ne pas polluer la console
+          if (apiError.response?.status === 401) {
+            // Silencieux - utilisateur pas connecté ou token expiré
+            set({ marketplacePosts: [] });
+          } else {
+            console.error('Erreur lors du chargement des posts:', error);
+          }
+        }
+      },
+
+      addMarketplacePost: async (postData) => {
+        const newPost: MarketplacePost = {
+          ...postData,
+          id: `post-${Date.now()}`,
+          timestamp: new Date(),
+          createdAt: new Date().toISOString(),
+          likes: 0,
+          comments: 0,
+          views: 0,
+          likedBy: [],
+          bookmarkedBy: []
+        };
+
+        try {
+          const response = await apiClient.post('/marketplace/posts', newPost);
+          
+          set((state) => ({
+            marketplacePosts: [response.data, ...state.marketplacePosts]
+          }));
+          return response.data.id;
+        } catch (error) {
+          console.error('Erreur lors de la création du post:', error);
+        }
+
+        // Fallback: ajouter localement si l'API échoue
+        set((state) => ({
+          marketplacePosts: [newPost, ...state.marketplacePosts]
+        }));
+        return newPost.id;
+      },
+
+      updateMarketplacePost: async (id, updates) => {
+        try {
+          const response = await apiClient.put(`/marketplace/posts/${id}`, { 
+            ...updates, 
+            updatedAt: new Date().toISOString() 
+          });
+          
+          set((state) => ({
+            marketplacePosts: state.marketplacePosts.map((post) =>
+              post.id === id ? response.data : post
+            )
+          }));
+          return;
+        } catch (error) {
+          console.error('Erreur lors de la mise à jour du post:', error);
+        }
+
+        // Fallback: mettre à jour localement
+        set((state) => ({
+          marketplacePosts: state.marketplacePosts.map((post) =>
+            post.id === id 
+              ? { ...post, ...updates, updatedAt: new Date().toISOString() }
+              : post
+          )
+        }));
+      },
+
+      deleteMarketplacePost: async (id) => {
+        try {
+          await apiClient.delete(`/marketplace/posts/${id}`);
+          
+          set((state) => ({
+            marketplacePosts: state.marketplacePosts.filter((post) => post.id !== id)
+          }));
+          return;
+        } catch (error) {
+          console.error('Erreur lors de la suppression du post:', error);
+        }
+
+        // Fallback: supprimer localement
+        set((state) => ({
+          marketplacePosts: state.marketplacePosts.filter((post) => post.id !== id)
+        }));
+      },
+
+      likeMarketplacePost: async (postId, userId) => {
+        const state = get();
+        const post = state.marketplacePosts.find(p => p.id === postId);
+        if (!post) return;
+
+        const isLiked = post.likedBy.includes(userId);
+        const newLikedBy = isLiked 
+          ? post.likedBy.filter(id => id !== userId)
+          : [...post.likedBy, userId];
+
+        try {
+          const response = await apiClient.post(`/marketplace/posts/${postId}/like`, { 
+            userId, 
+            isLiked: !isLiked 
+          });
+          
+          set((state) => ({
+            marketplacePosts: state.marketplacePosts.map((p) =>
+              p.id === postId ? response.data : p
+            )
+          }));
+          return;
+        } catch (error) {
+          console.error('Erreur lors du like:', error);
+        }
+
+        // Fallback: mettre à jour localement
+        set((state) => ({
+          marketplacePosts: state.marketplacePosts.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  likedBy: newLikedBy,
+                  likes: newLikedBy.length,
+                  isLiked: !isLiked
+                }
+              : p
+          )
+        }));
+      },
+
+      bookmarkMarketplacePost: async (postId, userId) => {
+        const state = get();
+        const post = state.marketplacePosts.find(p => p.id === postId);
+        if (!post) return;
+
+        const isBookmarked = post.bookmarkedBy.includes(userId);
+        const newBookmarkedBy = isBookmarked
+          ? post.bookmarkedBy.filter(id => id !== userId)
+          : [...post.bookmarkedBy, userId];
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/marketplace/posts/${postId}/bookmark`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, isBookmarked: !isBookmarked })
+          });
+
+          if (response.ok) {
+            const updatedPost = await response.json();
+            set((state) => ({
+              marketplacePosts: state.marketplacePosts.map((p) =>
+                p.id === postId ? updatedPost : p
+              )
+            }));
+            return;
+          }
+        } catch (error) {
+          console.error('Erreur lors du bookmark:', error);
+        }
+
+        // Fallback: mettre à jour localement
+        set((state) => ({
+          marketplacePosts: state.marketplacePosts.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  bookmarkedBy: newBookmarkedBy,
+                  isBookmarked: !isBookmarked
+                }
+              : p
+          )
+        }));
+      },
+
+      getMarketplacePostsByRole: (userRole) => {
+        const state = get();
+        if (!userRole) return state.marketplacePosts;
+        
+        return state.marketplacePosts.filter((post) => {
+          if (post.visibility === 'public') return true;
+          if (post.visibility === 'professionals') return true;
+          if (post.visibility === 'role-specific' && post.author.role === userRole) return true;
+          return false;
+        }).sort((a, b) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+      }
+    }),
+    {
+      name: 'business-storage'
+    }
+  )
+);
+

@@ -1,0 +1,121 @@
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
+import { useArtisanStore } from '../../stores/artisanStore';
+import ArtisanDashboard from './ArtisanDashboard';
+import QuoteManager from './QuoteManager';
+import InvoiceManager from './InvoiceManager';
+import ArtisanStats from './ArtisanStats';
+
+type ArtisanView = 'dashboard' | 'quotes' | 'invoices' | 'stats';
+
+const ArtisanLayout: React.FC = () => {
+  const { user } = useAuth();
+  const { loadStats, clearError } = useArtisanStore();
+  const [currentView, setCurrentView] = useState<ArtisanView>('dashboard');
+
+  useEffect(() => {
+    // Vérifier que l'utilisateur est bien un artisan
+    if (!user || user.role !== 'artisan') {
+      console.warn('⚠️ Accès artisan refusé - rôle:', user?.role);
+      return;
+    }
+
+    // Charger les statistiques de l'artisan
+    if (user.id) {
+      loadStats(user.id);
+    }
+
+    // Nettoyer les erreurs au montage
+    clearError();
+  }, [user, loadStats, clearError]);
+
+  // Si l'utilisateur n'est pas un artisan, afficher un message
+  if (!user || user.role !== 'artisan') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white shadow rounded-lg p-6 max-w-md mx-auto">
+          <div className="text-center">
+            <div className="text-4xl mb-4">🔒</div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Accès restreint
+            </h3>
+            <p className="text-gray-500">
+              Cette section est réservée aux artisans.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const renderContent = () => {
+    switch (currentView) {
+      case 'quotes':
+        return <QuoteManager />;
+      case 'invoices':
+        return <InvoiceManager />;
+      case 'stats':
+        return <ArtisanStats />;
+      default:
+        return <ArtisanDashboard />;
+    }
+  };
+
+  const isActive = (view: ArtisanView) => currentView === view;
+
+  const navButton = (view: ArtisanView, label: string, icon: string) => (
+    <button
+      onClick={() => setCurrentView(view)}
+      className={`${
+        isActive(view)
+          ? 'border-indigo-500 text-gray-900'
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors duration-200`}
+    >
+      {icon} {label}
+    </button>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Artisan */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex">
+              <div className="flex-shrink-0 flex items-center">
+                <h1 className="text-xl font-bold text-gray-900">
+                  🔨 Espace Artisan Pro
+                </h1>
+              </div>
+              <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                {navButton('dashboard', 'Tableau de bord', '📊')}
+                {navButton('quotes', 'Devis', '📋')}
+                {navButton('invoices', 'Factures', '🧾')}
+                {navButton('stats', 'Statistiques', '📈')}
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-700">
+                Bonjour, <strong>{user.name}</strong>
+              </span>
+              <button
+                onClick={() => window.location.href = '/#dashboard'}
+                className="text-sm text-indigo-600 hover:text-indigo-500"
+              >
+                Retour au dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Contenu principal */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {renderContent()}
+      </main>
+    </div>
+  );
+};
+
+export default ArtisanLayout;

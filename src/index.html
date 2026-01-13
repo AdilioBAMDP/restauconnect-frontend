@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- PWA Meta Tags -->
+    <title>RestauConnect - Plateforme de Restauration</title>
+    <meta name="description" content="Plateforme complète de gestion pour restaurants, fournisseurs et livreurs. Commandes, livraisons, paiements sécurisés." />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="RestauConnect" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://restauconnect.app/" />
+    <meta property="og:title" content="RestauConnect - Plateforme de Restauration" />
+    <meta property="og:description" content="Plateforme complète de gestion pour restaurants, fournisseurs et livreurs." />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://restauconnect.app/" />
+    <meta property="twitter:title" content="RestauConnect - Plateforme de Restauration" />
+    <meta property="twitter:description" content="Plateforme complète de gestion pour restaurants, fournisseurs et livreurs." />
+    <meta property="twitter:image" content="/icons/icon-512x512.png" />
+
+    <!-- Preconnect to external domains for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- DNS prefetch for Stripe -->
+    <link rel="dns-prefetch" href="//js.stripe.com" />
+    <link rel="dns-prefetch" href="//api.stripe.com" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

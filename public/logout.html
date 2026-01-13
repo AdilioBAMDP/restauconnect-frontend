@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Déconnexion Forcée</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 400px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        .btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #dc2626;
+        }
+        .btn-secondary {
+            background: #3b82f6;
+        }
+        .btn-secondary:hover {
+            background: #2563eb;
+        }
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚪 Déconnexion Forcée</h1>
+        <p>Cliquez sur le bouton ci-dessous pour supprimer toutes les données de session et vous déconnecter.</p>
+        
+        <button class="btn" onclick="forceLogout()">🔓 Déconnexion Forcée</button>
+        <button class="btn btn-secondary" onclick="goToLogin()">🏠 Retour à l'accueil</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        function forceLogout() {
+            const status = document.getElementById('status');
+            
+            try {
+                // Supprimer toutes les données localStorage
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                    console.log('Suppression:', key);
+                    localStorage.removeItem(key);
+                });
+                
+                // Supprimer toutes les données sessionStorage
+                sessionStorage.clear();
+                
+                // Supprimer les cookies
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                
+                status.className = 'status success';
+                status.innerHTML = '✅ Déconnexion réussie!<br>Toutes les données de session ont été supprimées.';
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                
+            } catch (error) {
+                status.className = 'status error';
+                status.style.background = '#fee2e2';
+                status.style.color = '#991b1b';
+                status.textContent = '❌ Erreur: ' + error.message;
+            }
+        }
+        
+        function goToLogin() {
+            window.location.href = '/';
+        }
+        
+        // Afficher les clés actuelles
+        window.addEventListener('load', () => {
+            const keys = Object.keys(localStorage);
+            console.log('Clés localStorage actuelles:', keys);
+            
+            const status = document.getElementById('status');
+            if (keys.length > 0) {
+                status.className = 'status info';
+                status.innerHTML = `📊 ${keys.length} élément(s) en session:<br><small>${keys.join(', ')}</small>`;
+            } else {
+                status.className = 'status success';
+                status.textContent = '✅ Aucune session active';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+/*
+ * Ce fichier utilise les directives Tailwind CSS.
+ * Assure-toi que Tailwind et PostCSS sont bien configurés dans le projet.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
