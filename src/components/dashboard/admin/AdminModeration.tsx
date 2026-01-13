@@ -25,8 +25,10 @@ export const AdminModeration: React.FC<AdminModerationProps> = () => {
       setLoading(true);
       setError(null);
       try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        
         // Messages à modérer
-        const msgRes = await fetch(`http://localhost:5000/api/admin/moderation/messages`, {
+        const msgRes = await fetch(`${API_URL}/admin/moderation/messages`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
             'Content-Type': 'application/json'
@@ -39,7 +41,7 @@ export const AdminModeration: React.FC<AdminModerationProps> = () => {
           setError(msgResult.error || 'Erreur lors du chargement des messages à modérer');
         }
         // Offres à modérer
-        const offerRes = await fetch(`http://localhost:5000/api/admin/moderation/offers`, {
+        const offerRes = await fetch(`${API_URL}/admin/moderation/offers`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
             'Content-Type': 'application/json'
@@ -52,7 +54,7 @@ export const AdminModeration: React.FC<AdminModerationProps> = () => {
           setError(offerResult.error || 'Erreur lors du chargement des offres à modérer');
         }
         // Avis à modérer
-        const reviewRes = await fetch(`http://localhost:5000/api/admin/moderation/reviews`, {
+        const reviewRes = await fetch(`${API_URL}/admin/moderation/reviews`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
             'Content-Type': 'application/json'
