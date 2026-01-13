@@ -3,14 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuthContext';
 
-interface TestAccount {
-  role: string;
-  label: string;
-  email: string;
-  password: string;
-  description: string;
-}
-
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -79,126 +71,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       isRequestInProgress.current = false;
     }
   };
-
-  const handleQuickLogin = async (testAccount: TestAccount) => {
-    // Empêcher les requêtes multiples simultanées
-    if (isRequestInProgress.current) {
-      console.log('⚠️ Une requête est déjà en cours');
-      return;
-    }
-    
-    setIsLoading(true);
-    setError(null);
-    isRequestInProgress.current = true;
-    
-    try {
-      // Attendre le rate limiter
-      await rateLimiter.wait();
-      
-      console.log('🔐 Connexion rapide:', testAccount.role);
-      await login(testAccount.email, testAccount.password);
-      console.log('✅ Connexion réussie');
-      // ⏱️ Attendre que React mette à jour isAuthenticated avant de fermer
-      setTimeout(() => {
-        console.log('🚪 Fermeture du modal de connexion');
-        onClose();
-      }, 300);
-    } catch (err) {
-      console.error('❌ Erreur de connexion rapide:', err);
-      setError(err instanceof Error ? err.message : 'Erreur de connexion');
-    } finally {
-      setIsLoading(false);
-      isRequestInProgress.current = false;
-    }
-  };
-
-  // Comptes de test essentiels uniquement
-  const testAccounts = [
-    { 
-      role: 'restaurant', 
-      label: '🍽️ Restaurant', 
-      email: 'restaurant1@restauconnect.com', 
-      password: 'password123',
-      description: 'Tableau de bord restaurant'
-    },
-    { 
-      role: 'driver', 
-      label: '🚗 Livreur', 
-      email: 'driver1@test.fr', 
-      password: 'password123',
-      description: 'Application livreur'
-    },
-    { 
-      role: 'artisan', 
-      label: '👨‍🍳 Artisan', 
-      email: 'artisan@test.fr', 
-      password: 'password123',
-      description: 'Compte artisan'
-    },
-    { 
-      role: 'supplier', 
-      label: '📦 Fournisseur', 
-      email: 'fournisseur@test.fr', 
-      password: 'password123',
-      description: 'Compte fournisseur'
-    },
-    { 
-      role: 'candidat', 
-      label: '👤 Candidat', 
-      email: 'candidat@test.fr', 
-      password: 'password123',
-      description: 'Compte candidat'
-    },
-    { 
-      role: 'community_manager', 
-      label: '📱 Community Manager', 
-      email: 'community_manager@test.fr', 
-      password: 'password123',
-      description: 'Gestion réseaux sociaux'
-    },
-    { 
-      role: 'banker', 
-      label: '🏦 Banquier', 
-      email: 'banquier@test.fr', 
-      password: 'password123',
-      description: 'Services bancaires'
-    },
-    { 
-      role: 'investor', 
-      label: '💼 Investisseur', 
-      email: 'investisseur@test.fr', 
-      password: 'password123',
-      description: 'Gestion investissements'
-    },
-    { 
-      role: 'accountant', 
-      label: '📊 Comptable', 
-      email: 'comptable@test.fr', 
-      password: 'password123',
-      description: 'Gestion comptabilité'
-    },
-    { 
-      role: 'carrier', 
-      label: '🚚 Transporteur', 
-      email: 'transporteur@test.fr', 
-      password: 'password123',
-      description: 'Gestion transport'
-    },
-    { 
-      role: 'super_admin', 
-      label: '⚙️ Admin', 
-      email: 'super_admin@test.fr', 
-      password: 'password123',
-      description: 'Administration système'
-    },
-    { 
-      role: 'driver', 
-      label: '🏍️ Livreur 2', 
-      email: 'livreur@test.fr', 
-      password: 'password123',
-      description: 'Compte livreur alternatif'
-    }
-  ];
 
   if (!isOpen) return null;
 
@@ -289,61 +161,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                     {isLoading ? '🔄 Connexion...' : '🚀 Se connecter'}
                   </button>
                 </form>
-              </div>
-
-              {/* Connexions rapides */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Connexion rapide - Comptes de test
-                </h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Cliquez sur un compte pour vous connecter instantanément
-                </p>
-                
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {testAccounts.map((account) => (
-                    <button
-                      key={account.role + '-' + account.email}
-                      onClick={() => handleQuickLogin(account)}
-                      disabled={isLoading}
-                      className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-orange-50 hover:border-orange-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="text-2xl">{account.label.split(' ')[0]}</div>
-                          <div>
-                            <div className="font-medium text-gray-900 group-hover:text-orange-600">
-                              {account.label}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {account.description}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs text-gray-400 font-mono">
-                            {account.email}
-                          </div>
-                          <div className="text-xs text-gray-300 font-mono">
-                            {account.password}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="text-center text-sm text-gray-500">
-                <p className="mb-2">
-                  🧪 <strong>Mode Test :</strong> Ces comptes sont disponibles pour tester toutes les fonctionnalités
-                </p>
-                <p>
-                  💡 Chaque rôle a accès à son tableau de bord spécialisé avec des permissions adaptées
-                </p>
               </div>
             </div>
           </div>
