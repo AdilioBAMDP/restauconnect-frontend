@@ -7,6 +7,7 @@ import {
 import ProductCard from '@/components/products/ProductCard';
 import useCartStore from '@/stores/cartStore';
 import { useNavigation } from '@/hooks/useNavigation';
+import { apiClient } from '@/services/api';
 // ...existing code...
 import PublishOfferModal from '@/components/offers/PublishOfferModal';
 import CartSummaryWidget from '@/components/cart/CartSummaryWidget';
@@ -72,9 +73,8 @@ const SupplierCatalogView: React.FC = () => {
   const fetchCatalog = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/products/supplier/${supplierId}/catalog`);
-      const data = await response.json();
-      setCatalogData(data.data);
+      const response = await apiClient.get(`/products/supplier/${supplierId}/catalog`);
+      setCatalogData(response.data.data);
     } catch {
       setCatalogData(null);
     } finally {
