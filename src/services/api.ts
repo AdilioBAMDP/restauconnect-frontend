@@ -108,6 +108,7 @@ export const apiService = {
     logout: () => {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('auth_user');
+      window.location.href = '/';
     },
     
     getCurrentUser: async (): Promise<User> => {
