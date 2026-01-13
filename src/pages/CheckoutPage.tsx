@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { authService } from '@/services/authService';
+import { apiClient } from '@/services/api';
 import Header from '@/components/layout/Header';
 import { useNavigation } from '@/hooks/useNavigation';
 
@@ -185,50 +186,33 @@ const CheckoutForm: React.FC<{ onSuccess?: (orderId: string) => void }> = ({ onS
         urgency: formData.urgency,
       });
 
-      // 2. Créer PaymentIntent côté backend
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('Non authentifié - veuillez vous reconnecter');
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/payments/create-payment-intent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+      // 2. Créer PaymentIntent côté backend avec apiClient
+      const response = await apiClient.post('/payments/create-payment-intent', {
+        amount: Math.round(total * 100), // Stripe utilise les centimes
+        currency: 'eur',
+        orderData: {
+          items: items.map(item => ({
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            unit: item.unit,
+          })),
+          supplierId: supplier?.id,
+          deliveryAddress: formData.deliveryAddress,
+          deliveryDate: formData.deliveryDate,
+          deliveryTime: formData.deliveryTime,
+          specialInstructions: formData.specialInstructions,
+          urgency: formData.urgency,
+          contactPhone: formData.contactPhone,
+          contactEmail: formData.contactEmail,
+          subtotal,
+          deliveryFee,
+          total,
         },
-        body: JSON.stringify({
-          amount: Math.round(total * 100), // Stripe utilise les centimes
-          currency: 'eur',
-          orderData: {
-            items: items.map(item => ({
-              productId: item.productId,
-              name: item.name,
-              quantity: item.quantity,
-              price: item.price,
-              unit: item.unit,
-            })),
-            supplierId: supplier?.id,
-            deliveryAddress: formData.deliveryAddress,
-            deliveryDate: formData.deliveryDate,
-            deliveryTime: formData.deliveryTime,
-            specialInstructions: formData.specialInstructions,
-            urgency: formData.urgency,
-            contactPhone: formData.contactPhone,
-            contactEmail: formData.contactEmail,
-            subtotal,
-            deliveryFee,
-            total,
-          },
-        }),
       });
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de la création du paiement');
-      }
-
-      const { clientSecret, orderId } = await response.json();
+      const { clientSecret, orderId } = response.data;
 
       // 3. Confirmer le paiement avec Stripe
       const result = await stripe.confirmCardPayment(clientSecret, {
