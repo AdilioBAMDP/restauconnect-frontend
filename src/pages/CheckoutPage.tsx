@@ -187,12 +187,21 @@ const CheckoutForm: React.FC<{ onSuccess?: (orderId: string) => void }> = ({ onS
       });
 
       // 2. Créer PaymentIntent côté backend avec apiClient
-      // Fallback: récupérer supplierId depuis localStorage si supplier.id est undefined
-      const supplierId = supplier?.id || localStorage.getItem('selectedSupplierId') || items[0]?.supplierId;
+      // Récupérer supplierId avec plusieurs fallbacks
+      let supplierId = supplier?.id || localStorage.getItem('selectedSupplierId') || items[0]?.supplierId;
       
-      if (!supplierId) {
-        throw new Error('Fournisseur non trouvé. Veuillez retourner au catalogue.');
+      // Si toujours undefined, essayer de le récupérer depuis le supplier du store
+      if (!supplierId || supplierId === 'undefined') {
+        const storedSupplier = JSON.parse(localStorage.getItem('selectedSupplier') || '{}');
+        supplierId = storedSupplier._id || storedSupplier.id;
       }
+      
+      // Dernière vérification avant d'envoyer
+      if (!supplierId || supplierId === 'undefined') {
+        throw new Error('Impossible de trouver l\'ID du fournisseur. Veuillez retourner au catalogue et resélectionner le fournisseur.');
+      }
+      
+      console.log('✅ SupplierId trouvé:', supplierId);
       
       const response = await apiClient.post('/payments/create-payment-intent', {
         amount: Math.round(total * 100), // Stripe utilise les centimes
