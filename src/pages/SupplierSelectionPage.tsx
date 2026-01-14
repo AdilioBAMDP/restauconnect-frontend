@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { logger } from '@/utils/logger';
 import { apiClient } from '@/services/api';
 import { useNavigation } from '@/hooks/useNavigation';
+import useCartStore from '@/stores/cartStore';
 
 interface Supplier {
   _id: string;
@@ -20,6 +21,7 @@ interface Supplier {
 
 const SupplierSelectionPage = () => {
   const { navigateTo } = useNavigation();
+  const { setSupplier } = useCartStore();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,8 +51,25 @@ const SupplierSelectionPage = () => {
   }, []);
 
   const handleSupplierSelect = (supplierId: string) => {
-    // Sauvegarder l'ID du fournisseur sélectionné
+    // Trouver le fournisseur sélectionné
+    const selectedSupplier = suppliers.find(s => s._id === supplierId);
+    
+    // Sauvegarder l'ID ET l'objet complet du fournisseur
     localStorage.setItem('selectedSupplierId', supplierId);
+    if (selectedSupplier) {
+      localStorage.setItem('selectedSupplier', JSON.stringify(selectedSupplier));
+      
+      // Mettre à jour le store du panier avec le fournisseur
+      setSupplier({
+        id: selectedSupplier._id,
+        name: selectedSupplier.name,
+        deliveryFee: 15, // Valeur par défaut, à ajuster selon vos besoins
+        minimumOrder: selectedSupplier.minimumOrder || 0
+      });
+      
+      console.log('✅ Fournisseur sélectionné et stocké:', selectedSupplier);
+    }
+    
     // Naviguer vers la page catalogue (sans recharger la page)
     navigateTo('supplier-catalog', { supplierId });
   };
