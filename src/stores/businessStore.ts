@@ -2521,14 +2521,32 @@ export const useBusinessStore = create<BusinessState>()(
           }
         } catch (error: unknown) {
           const apiError = error as { response?: { status?: number } };
-          console.error('âŒ [fetchMarketplace] Erreur:', apiError);
           
-          // Erreur 401 = non authentifiÃ©, ne pas polluer la console
+          // Si erreur 401, réessayer SANS token (token expiré mais API accepte anonyme)
           if (apiError.response?.status === 401) {
-            // Silencieux - utilisateur pas connectÃ© ou token expirÃ©
+            console.log('🔄 [fetchMarketplace] Token expiré, retry sans auth...');
+            try {
+              const endpoint = FEATURES.SMART_RANKING 
+                ? '/marketplace/posts/ranked'
+                : '/marketplace/posts';
+              
+              // Appel direct sans passer par apiClient (qui ajoute le token)
+              const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+              const response = await fetch(`${baseURL}${endpoint}`);
+              const data = await response.json();
+              
+              if (data?.success && data?.data?.posts) {
+                set({ marketplacePosts: data.data.posts });
+                console.log('✅ [fetchMarketplace] Posts chargés sans auth:', data.data.posts.length);
+                return;
+              }
+            } catch (retryError) {
+              console.error('❌ [fetchMarketplace] Retry failed:', retryError);
+            }
             set({ marketplacePosts: [] });
           } else {
-            console.error('Erreur lors du chargement des posts:', error);
+            console.error('❌ [fetchMarketplace] Erreur:', error);
+            set({ marketplacePosts: [] });
           }
         }
       },
@@ -2713,4 +2731,5 @@ export const useBusinessStore = create<BusinessState>()(
     }
   )
 );
+
 
