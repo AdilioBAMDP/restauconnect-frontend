@@ -1,16 +1,30 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { splitVendorChunkPlugin } from 'vite';
 import { fileURLToPath, URL } from 'node:url';
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [
-    react(),
-    // Séparation des chunks vendor pour de meilleures performances
-    splitVendorChunkPlugin()
-  ],
-  resolve: {
+export default defineConfig(({ mode }) => {
+  // Charger les variables d'environnement
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
+    plugins: [
+      react(),
+      // Séparation des chunks vendor pour de meilleures performances
+      splitVendorChunkPlugin()
+    ],
+    define: {
+      // Exposer les variables VITE_ explicitement
+      'import.meta.env.VITE_API_URL': JSON.stringify(
+        env.VITE_API_URL || 'https://restauconnect-backen-production-70be.up.railway.app/api'
+      ),
+      // @ts-expect-error: JSON est disponible globalement à l'exécution
+      __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+      // @ts-expect-error: JSON est disponible globalement à l'exécution
+      __DEFINES__: JSON.stringify({})
+    },
+    resolve: {
     alias: [
       {
         find: /^@\//,
@@ -79,12 +93,6 @@ export default defineConfig({
       'axios',
       'zustand'
     ]
-  },
-  // Variables d'environnement
-  define: {
-    // @ts-expect-error: JSON est disponible globalement à l'exécution
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
-    // @ts-expect-error: JSON est disponible globalement à l'exécution
-    __DEFINES__: JSON.stringify({})
   }
 });
+}
