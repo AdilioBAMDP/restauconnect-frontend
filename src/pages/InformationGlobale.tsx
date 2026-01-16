@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { useNavigation } from '@/hooks/useNavigation';
+import { useBusinessStore } from '@/stores/businessStore';
 
 interface RealtimeNotification {
   id: string;
@@ -35,43 +36,51 @@ interface RealtimeNotification {
 }
 
 const InformationGlobale: React.FC = () => {
-  // const { user } = useAuthStore();
   const { navigateTo } = useNavigation();
+  const { globalAnnouncements, fetchGlobalAnnouncements } = useBusinessStore();
   const [notifications, setNotifications] = useState<RealtimeNotification[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'order' | 'message' | 'alert'>('all');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Simuler des notifications en temps réel (à remplacer par WebSocket/API réelle)
+  // Charger les vraies annonces depuis l'API
   useEffect(() => {
-    const mockNotifications: RealtimeNotification[] = [
-      {
-        id: '1',
-        type: 'order',
-        title: 'Nouvelle commande',
-        message: 'Commande #CMD-2025-001 reçue',
-        timestamp: new Date(),
-        read: false,
-        userName: 'Restaurant Le Gourmet'
-      },
-      {
-        id: '2',
-        type: 'message',
-        title: 'Nouveau message',
-        message: 'Message reçu de Jean Dupont',
-        timestamp: new Date(Date.now() - 1000 * 60 * 5),
-        read: false,
-        userName: 'Jean Dupont'
-      },
-      {
-        id: '3',
-        type: 'alert',
-        title: 'Alerte stock',
-        message: 'Stock faible sur le produit XYZ',
-        timestamp: new Date(Date.now() - 1000 * 60 * 15),
-        read: false
+    const loadData = async () => {
+      console.log('🔄 [InformationGlobale] Chargement des annonces...');
+      setIsLoading(true);
+      
+      try {
+        await fetchGlobalAnnouncements();
+        console.log('✅ [InformationGlobale] Annonces chargées:', globalAnnouncements.length);
+      } catch (error) {
+        console.error('❌ [InformationGlobale] Erreur chargement:', error);
+      } finally {
+        setIsLoading(false);
       }
-    ];
-    setNotifications(mockNotifications);
-  }, []);
+    };
+
+    loadData();
+    
+    // Refresh automatique toutes les 30 secondes
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchGlobalAnnouncements]);
+
+  // Convertir les announcements en notifications
+  useEffect(() => {
+    if (globalAnnouncements.length > 0) {
+      const convertedNotifications: RealtimeNotification[] = globalAnnouncements.map(ann => ({
+        id: ann.id,
+        type: ann.priority === 'urgent' ? 'alert' : 'activity',
+        title: ann.title,
+        message: ann.content,
+        timestamp: new Date(ann.createdAt),
+        read: false,
+        userName: ann.createdBy?.name || 'Système'
+      }));
+      setNotifications(convertedNotifications);
+      console.log('📝 [InformationGlobale] Notifications converties:', convertedNotifications.length);
+    }
+  }, [globalAnnouncements]);
 
   const getIconByType = (type: string) => {
     switch (type) {
@@ -225,60 +234,71 @@ const InformationGlobale: React.FC = () => {
 
         {/* Liste des notifications */}
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="divide-y divide-gray-200">
-            {filteredNotifications.length > 0 ? (
-              filteredNotifications.map((notification, index) => (
-                <motion.div
-                  key={notification.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`p-6 hover:bg-gray-50 transition-colors ${
-                    !notification.read ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      {getIconByType(notification.type)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-gray-900">
-                          {notification.title}
-                        </h3>
-                        <span className="text-sm text-gray-500 flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {new Date(notification.timestamp).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
+          {isLoading ? (
+            <div className="p-12 text-center">
+              <Activity className="w-16 h-16 mx-auto mb-4 opacity-20 animate-spin" />
+              <p className="text-lg text-gray-500">Chargement des informations...</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {filteredNotifications.length > 0 ? (
+                filteredNotifications.map((notification, index) => (
+                  <motion.div
+                    key={notification.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`p-6 hover:bg-gray-50 transition-colors ${
+                      !notification.read ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0">
+                        {getIconByType(notification.type)}
                       </div>
-                      <p className="text-gray-600 mb-2">{notification.message}</p>
-                      {notification.userName && (
-                        <p className="text-sm text-gray-500">
-                          <Users className="w-4 h-4 inline mr-1" />
-                          {notification.userName}
-                        </p>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="font-semibold text-gray-900">
+                            {notification.title}
+                          </h3>
+                          <span className="text-sm text-gray-500 flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            {new Date(notification.timestamp).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 mb-2">{notification.message}</p>
+                        {notification.userName && (
+                          <p className="text-sm text-gray-500">
+                            <Users className="w-4 h-4 inline mr-1" />
+                            {notification.userName}
+                          </p>
+                        )}
+                      </div>
+                      {!notification.read && (
+                        <div className="flex-shrink-0">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Nouveau
+                          </span>
+                        </div>
                       )}
                     </div>
-                    {!notification.read && (
-                      <div className="flex-shrink-0">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Nouveau
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="p-12 text-center text-gray-500">
-                <Bell className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                <p className="text-lg">Aucune notification</p>
-              </div>
-            )}
-          </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="p-12 text-center text-gray-500">
+                  <Bell className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                  <p className="text-lg mb-2">Aucune notification pour le moment</p>
+                  <p className="text-sm">Les informations apparaîtront ici en temps réel</p>
+                  <p className="text-xs mt-4 text-gray-400">
+                    Debug: {globalAnnouncements.length} annonces dans le store
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
