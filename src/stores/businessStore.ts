@@ -2356,7 +2356,7 @@ export const useBusinessStore = create<BusinessState>()(
           const token = localStorage.getItem('token');
           console.log('ðŸ” [fetchAnnouncements] Token prÃ©sent:', !!token);
           
-          const response = await fetch('http://localhost:5000/api/announcements', {
+          const response = await fetch(`${API_BASE_URL}/announcements`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
