@@ -271,7 +271,8 @@ class NavigationManagerClass {
       'banques': '/banker/banks',
       
       // Pages générales
-      'information-globale': '/info',
+      'information-globale': '/#information-globale',
+      'marketplace': '/#marketplace',
       'offer-details': '/marketplace/offer',
       'test-accounts': '/test/accounts',
       'api-test': '/test/api',
