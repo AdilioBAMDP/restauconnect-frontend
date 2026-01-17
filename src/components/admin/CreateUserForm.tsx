@@ -24,6 +24,8 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
     location: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const roles = [
     { value: 'restaurant', label: 'Restaurant', icon: '🍽️', description: 'Propriétaires de restaurants' },
@@ -35,20 +37,59 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
     { value: 'investisseur', label: 'Investisseur', icon: '💼', description: 'Investisseurs et financeurs' },
     { value: 'comptable', label: 'Comptable', icon: '📊', description: 'Experts comptables' },
     { value: 'livreur', label: 'Livreur', icon: '🚗', description: 'Chauffeurs livreurs' },
+    { value: 'transporteur', label: 'Transporteur', icon: '🚚', description: 'Transporteurs et logistique' },
+    { value: 'auditeur', label: 'Auditeur', icon: '📋', description: 'Auditeurs et contrôleurs' },
+    { value: 'admin', label: 'Admin', icon: '👨‍💼', description: 'Administrateurs' },
     { value: 'super_admin', label: 'Super Admin', icon: '⚡', description: 'Administrateurs système' }
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
+    setSuccess('');
     
     try {
-      // Simuler appel API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Non authentifié. Veuillez vous reconnecter.');
+      }
       
-      onCreate(formData);
+      const API_URL = import.meta.env.VITE_API_URL || 'https://restauconnect-backen-production-70be.up.railway.app';
       
-      // Reset form
+      // ✅ VRAIE REQUÊTE API
+      const response = await fetch(`${API_URL}/api/admin/users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          name: formData.username,
+          role: formData.role,
+          phone: formData.phone || undefined,
+          companyName: formData.companyName || undefined,
+          location: formData.location ? {
+            address: formData.location,
+            city: '',
+            postalCode: ''
+          } : undefined
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `Erreur ${response.status}: ${response.statusText}`);
+      }
+      
+      // ✅ SUCCÈS
+      setSuccess(`✅ ${data.message || 'Utilisateur créé avec succès !'}`);
+      onCreate(data.data);
+      
+      // Reset form après succès
       setFormData({
         username: '',
         email: '',
@@ -58,8 +99,13 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
         companyName: '',
         location: ''
       });
-    } catch (error) {
+      
+      // Masquer le message de succès après 5 secondes
+      setTimeout(() => setSuccess(''), 5000);
+      
+    } catch (error: any) {
       console.error('Erreur création utilisateur:', error);
+      setError(error.message || 'Une erreur est survenue lors de la création');
     } finally {
       setIsLoading(false);
     }
@@ -92,6 +138,21 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Messages d'erreur et succès */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center gap-2">
+              <span className="text-lg">❌</span>
+              <p className="text-sm font-medium">{error}</p>
+            </div>
+          )}
+          
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2">
+              <span className="text-lg">✅</span>
+              <p className="text-sm font-medium">{success}</p>
+            </div>
+          )}
+          
           {/* Informations de base */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
