@@ -27,6 +27,23 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Mapping des rôles français (frontend UX) vers anglais (backend)
+  const roleMapping: { [key: string]: string } = {
+    'restaurant': 'restaurant',
+    'artisan': 'artisan',
+    'fournisseur': 'supplier',
+    'candidat': 'candidat',
+    'community_manager': 'community_manager',
+    'banquier': 'banker',
+    'livreur': 'driver',
+    'investisseur': 'investor',
+    'comptable': 'accountant',
+    'transporteur': 'carrier',
+    'auditeur': 'auditor',
+    'admin': 'admin',
+    'super_admin': 'super_admin'
+  };
+
   const roles = [
     { value: 'restaurant', label: 'Restaurant', icon: '🍽️', description: 'Propriétaires de restaurants' },
     { value: 'artisan', label: 'Artisan', icon: '🔧', description: 'Artisans et techniciens' },
@@ -57,6 +74,9 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
       
       const API_URL = import.meta.env.VITE_API_URL || 'https://restauconnect-backen-production-70be.up.railway.app';
       
+      // Convertir le rôle français en anglais pour le backend
+      const backendRole = roleMapping[formData.role] || formData.role;
+      
       // ✅ VRAIE REQUÊTE API
       const response = await fetch(`${API_URL}/api/admin/users`, {
         method: 'POST',
@@ -68,7 +88,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({ onCreate }) => {
           email: formData.email,
           password: formData.password,
           name: formData.username,
-          role: formData.role,
+          role: backendRole,
           phone: formData.phone || undefined,
           companyName: formData.companyName || undefined,
           location: formData.location ? {

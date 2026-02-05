@@ -94,6 +94,19 @@ const ProfessionalRegistrationForm: React.FC<ProfessionalRegistrationFormProps> 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [filteredSpecializations, setFilteredSpecializations] = useState<string[]>([]);
 
+  // Mapping des rôles français (frontend UX) vers anglais (backend)
+  const roleMapping: { [key: string]: string } = {
+    'restaurant': 'restaurant',
+    'artisan': 'artisan',
+    'fournisseur': 'supplier',
+    'candidat': 'candidat',
+    'community_manager': 'community_manager',
+    'banquier': 'banker',
+    'livreur': 'driver',
+    'investisseur': 'investor',
+    'comptable': 'accountant'
+  };
+
   const professionalTypes = [
     { id: 'restaurant', title: 'Restaurant', icon: Users, description: 'Propriétaire ou gérant de restaurant' },
     { id: 'artisan', title: 'Artisan & Services', icon: Wrench, description: 'Plombier, électricien, chauffagiste, nettoyeur...' },
@@ -499,11 +512,14 @@ const ProfessionalRegistrationForm: React.FC<ProfessionalRegistrationFormProps> 
       // Générer un mot de passe temporaire (l'utilisateur devra le changer après validation)
       const tempPassword = `Temp${Date.now()}!`;
       
+      // Convertir le rôle français en anglais pour le backend
+      const backendRole = roleMapping[formData.professionalType] || formData.professionalType;
+      
       const response = await axios.post(`${API_URL}/auth/register`, {
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         password: tempPassword,
-        role: formData.professionalType,
+        role: backendRole,
         firstName: formData.firstName,
         lastName: formData.lastName,
         phone: formData.phone,
