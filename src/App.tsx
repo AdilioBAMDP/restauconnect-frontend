@@ -296,23 +296,23 @@ function AppContent() {
           // Redirection intelligente selon le rôle utilisateur
           if (user?.role === 'restaurant') {
             return <CompleteDashboard />;
-          } else if (user?.role === 'fournisseur') {
+          } else if (user?.role === 'supplier' || user?.role === 'fournisseur') {
             return <SupplierDashboard navigateTo={navigateToString} />;
           } else if (user?.role === 'artisan') {
             return <ArtisanDashboardUnified />;
-          } else if (user?.role === 'banquier') {
+          } else if (user?.role === 'banker' || user?.role === 'banquier') {
             return <BankerDashboard onNavigate={navigateToString} />;
-          } else if (user?.role === 'investisseur') {
+          } else if (user?.role === 'investor' || user?.role === 'investisseur') {
             return <InvestorDashboard onNavigate={navigateToString} />;
-          } else if (user?.role === 'livreur') {
+          } else if (user?.role === 'driver' || user?.role === 'livreur') {
             return <DriverDashboard />;
           } else if (user?.role === 'candidat') {
             return <CandidatDashboard />;
-          } else if (user?.role === 'transporteur' || user?.role === 'carrier') {
+          } else if (user?.role === 'carrier' || user?.role === 'transporteur') {
             return <TransporteurDashboard />;
-          } else if (user?.role === 'auditeur') {
+          } else if (user?.role === 'auditor' || user?.role === 'auditeur') {
             return <AuditeurDashboard />;
-          } else if (user?.role === 'comptable') {
+          } else if (user?.role === 'accountant' || user?.role === 'comptable') {
             return <AccountantDashboard />;
           } else if (user?.role === 'admin' || user?.role === 'super_admin') {
             return <AdminDashboard navigateTo={navigateToString} />;

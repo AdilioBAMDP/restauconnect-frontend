@@ -486,11 +486,6 @@ const ProfessionalRegistrationForm: React.FC<ProfessionalRegistrationFormProps> 
       return;
     }
 
-    if (!formData.profilePhoto) {
-      toast.error('Veuillez ajouter une photo de profil');
-      return;
-    }
-    
     if (!formData.acceptTerms) {
       toast.error('Veuillez accepter les conditions générales');
       return;
