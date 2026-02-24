@@ -2419,27 +2419,21 @@ export const useBusinessStore = create<BusinessState>()(
       confirmAnnouncementActive: (id, isActive) => {
         const now = new Date();
         if (isActive) {
-          // L'annonce reste active, programmer prochaine confirmation dans 4h
+          // L'annonce reste active, mettre a jour lastConfirmed
           set((state) => ({
             globalAnnouncements: state.globalAnnouncements.map((ann) =>
-              ann.id === id 
-                try {
-                  const headers = getAuthHeaders();
-                  console.log(' [fetchAnnouncements] Token pr e9sent:', !!headers.Authorization);
-                  const response = await fetch(`${API_BASE_URL}/announcements`, {
-                    headers: {
-                      ...headers,
-                      'Content-Type': 'application/json'
-                    }
-                  });
-          // Supprimer l'annonce car elle n'est plus d'actualitÃ©
+              ann.id === id ? { ...ann, lastConfirmed: now.toISOString() } : ann
+            )
+          }));
+        } else {
+          // Supprimer l'annonce car elle n'est plus d'actualite
           set((state) => ({
             globalAnnouncements: state.globalAnnouncements.filter((ann) => ann.id !== id)
           }));
         }
       },
 
-      recordAnnouncementInteraction: (interactionData) => {
+            recordAnnouncementInteraction: (interactionData) => {
         const newInteraction: AnnouncementInteraction = {
           ...interactionData,
           id: `int-${Date.now()}`,
