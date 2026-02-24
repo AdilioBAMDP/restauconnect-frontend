@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Edit, Trash2, Eye, Mail, Phone, MapPin, Building, Calendar, UserCheck, UserX, Crown, Key, Lock } from 'lucide-react';
+import { Search, Edit, Trash2, Eye, Mail, Phone, MapPin, Building, Calendar, UserCheck, UserX, Crown, Key, Lock, X, Shield } from 'lucide-react';
 
 interface User {
   id: string;
@@ -27,6 +27,7 @@ interface UserListProps {
 }
 
 const UserList: React.FC<UserListProps> = ({ users, onDelete, onEdit, onToggleStatus }) => {
+  const [viewUser, setViewUser] = useState<User | null>(null);
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<Partial<User>>({});
   const [editLoading, setEditLoading] = useState(false);
@@ -124,13 +125,27 @@ const UserList: React.FC<UserListProps> = ({ users, onDelete, onEdit, onToggleSt
     setEditLoading(true);
     setEditError(null);
     try {
+      // Bug 4 fix: mapper username → name (champ attendu par le backend)
+      const payload: Record<string, unknown> = { ...editForm };
+      if (payload.username) {
+        payload.name = payload.username;
+        delete payload.username;
+      }
+      // Mapper les rôles français → anglais si nécessaire
+      const roleToEN: Record<string, string> = {
+        fournisseur: 'supplier', livreur: 'driver', banquier: 'banker',
+        investisseur: 'investor', comptable: 'accountant', transporteur: 'carrier', auditeur: 'auditor'
+      };
+      if (payload.role && typeof payload.role === 'string' && roleToEN[payload.role]) {
+        payload.role = roleToEN[payload.role];
+      }
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${editUser.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify(payload)
       });
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Erreur lors de la modification');
@@ -150,19 +165,48 @@ const UserList: React.FC<UserListProps> = ({ users, onDelete, onEdit, onToggleSt
   const [sortBy, setSortBy] = useState('username');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  const roleInfo = {
+  // Bug 2 fix: support rôles anglais (backend) ET français (legacy)
+  const roleInfo: Record<string, { label: string; icon: string; color: string }> = {
+    // Rôles anglais (backend)
     restaurant: { label: 'Restaurant', icon: '🍽️', color: 'bg-orange-100 text-orange-800' },
     artisan: { label: 'Artisan', icon: '🔧', color: 'bg-blue-100 text-blue-800' },
-    fournisseur: { label: 'Fournisseur', icon: '📦', color: 'bg-green-100 text-green-800' },
+    supplier: { label: 'Fournisseur', icon: '📦', color: 'bg-green-100 text-green-800' },
     candidat: { label: 'Candidat', icon: '👤', color: 'bg-gray-100 text-gray-800' },
     community_manager: { label: 'Community Manager', icon: '📢', color: 'bg-purple-100 text-purple-800' },
+    banker: { label: 'Banquier', icon: '🏦', color: 'bg-indigo-100 text-indigo-800' },
+    investor: { label: 'Investisseur', icon: '💼', color: 'bg-yellow-100 text-yellow-800' },
+    accountant: { label: 'Comptable', icon: '📊', color: 'bg-teal-100 text-teal-800' },
+    driver: { label: 'Livreur', icon: '🚗', color: 'bg-red-100 text-red-800' },
+    carrier: { label: 'Transporteur', icon: '🚚', color: 'bg-pink-100 text-pink-800' },
+    auditor: { label: 'Auditeur', icon: '📋', color: 'bg-cyan-100 text-cyan-800' },
+    admin: { label: 'Admin', icon: '🛡️', color: 'bg-yellow-100 text-yellow-800 font-bold border border-yellow-400' },
+    super_admin: { label: 'Super Admin', icon: '⚡', color: 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 font-bold border border-purple-400' },
+    // Alias français (legacy / backward compat)
+    fournisseur: { label: 'Fournisseur', icon: '📦', color: 'bg-green-100 text-green-800' },
     banquier: { label: 'Banquier', icon: '🏦', color: 'bg-indigo-100 text-indigo-800' },
     investisseur: { label: 'Investisseur', icon: '💼', color: 'bg-yellow-100 text-yellow-800' },
     comptable: { label: 'Comptable', icon: '📊', color: 'bg-teal-100 text-teal-800' },
     livreur: { label: 'Livreur', icon: '🚗', color: 'bg-red-100 text-red-800' },
-    admin: { label: 'Admin', icon: '🛡️', color: 'bg-yellow-100 text-yellow-800 font-bold border border-yellow-400' },
-    super_admin: { label: 'Super Admin', icon: '⚡', color: 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 font-bold border border-purple-400' }
+    transporteur: { label: 'Transporteur', icon: '🚚', color: 'bg-pink-100 text-pink-800' },
+    auditeur: { label: 'Auditeur', icon: '📋', color: 'bg-cyan-100 text-cyan-800' },
   };
+
+  // Rôles canoniques (anglais) pour le dropdown d'édition
+  const editableRoles = [
+    { value: 'restaurant', label: '🍽️ Restaurant' },
+    { value: 'artisan', label: '🔧 Artisan' },
+    { value: 'supplier', label: '📦 Fournisseur' },
+    { value: 'candidat', label: '👤 Candidat' },
+    { value: 'community_manager', label: '📢 Community Manager' },
+    { value: 'banker', label: '🏦 Banquier' },
+    { value: 'investor', label: '💼 Investisseur' },
+    { value: 'accountant', label: '📊 Comptable' },
+    { value: 'driver', label: '🚗 Livreur' },
+    { value: 'carrier', label: '🚚 Transporteur' },
+    { value: 'auditor', label: '📋 Auditeur' },
+    { value: 'admin', label: '🛡️ Admin' },
+    { value: 'super_admin', label: '⚡ Super Admin' },
+  ];
 
   const filteredAndSortedUsers = useMemo(() => {
     const filtered = users.filter(user => {
@@ -381,7 +425,7 @@ const UserList: React.FC<UserListProps> = ({ users, onDelete, onEdit, onToggleSt
                     {/* Actions */}
                     <div className="flex items-center gap-2 ml-4">
                       <button
-                        onClick={() => console.log('Voir profil', user.id)}
+                        onClick={() => setViewUser(user)}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Voir le profil"
                       >
@@ -427,6 +471,82 @@ const UserList: React.FC<UserListProps> = ({ users, onDelete, onEdit, onToggleSt
           </div>
         )}
       </div>
+
+      {/* Bug 1 fix: Modale de profil utilisateur */}
+      {viewUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40" onClick={() => setViewUser(null)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-t-xl p-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-white bg-opacity-20 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  {(viewUser.username || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">{viewUser.username || 'Utilisateur'}</h3>
+                  <p className="text-blue-100 text-sm">{roleInfo[viewUser.role]?.icon} {roleInfo[viewUser.role]?.label || viewUser.role}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewUser(null)} className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-1 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Body */}
+            <div className="p-6 space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <Mail className="w-4 h-4 text-gray-400" />
+                <div><p className="text-xs text-gray-500">Email</p><p className="font-medium text-gray-900">{viewUser.email}</p></div>
+              </div>
+              {viewUser.phone && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <Phone className="w-4 h-4 text-gray-400" />
+                  <div><p className="text-xs text-gray-500">Téléphone</p><p className="font-medium text-gray-900">{viewUser.phone}</p></div>
+                </div>
+              )}
+              {viewUser.companyName && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <Building className="w-4 h-4 text-gray-400" />
+                  <div><p className="text-xs text-gray-500">Entreprise</p><p className="font-medium text-gray-900">{viewUser.companyName}</p></div>
+                </div>
+              )}
+              {viewUser.location && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <MapPin className="w-4 h-4 text-gray-400" />
+                  <div><p className="text-xs text-gray-500">Ville</p><p className="font-medium text-gray-900">{typeof viewUser.location === 'string' ? viewUser.location : viewUser.location.city || viewUser.location.address || 'N/A'}</p></div>
+                </div>
+              )}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <Shield className="w-4 h-4 text-gray-400" />
+                <div><p className="text-xs text-gray-500">Statut</p>
+                  <span className={`font-medium ${viewUser.isActive !== false ? 'text-green-600' : 'text-red-600'}`}>
+                    {viewUser.isActive !== false ? '✓ Actif' : '✗ Inactif'}
+                  </span>
+                </div>
+              </div>
+              {viewUser.createdAt && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <div><p className="text-xs text-gray-500">Créé le</p><p className="font-medium text-gray-900">{formatDate(viewUser.createdAt)}</p></div>
+                </div>
+              )}
+              {viewUser.lastLogin && (
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <div><p className="text-xs text-gray-500">Dernière connexion</p><p className="font-medium text-gray-900">{formatDate(viewUser.lastLogin)}</p></div>
+                </div>
+              )}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <span className="text-xs text-gray-500">ID:</span>
+                <code className="text-xs text-gray-600 font-mono break-all">{viewUser.id}</code>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-6">
+              <button onClick={() => { setViewUser(null); handleEditClick(viewUser); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm">✏️ Modifier</button>
+              <button onClick={() => setViewUser(null)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm">Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal d'édition utilisateur */}
       {editUser && (
@@ -503,10 +623,8 @@ const UserList: React.FC<UserListProps> = ({ users, onDelete, onEdit, onToggleSt
                   onChange={e => handleEditChange('role', e.target.value)}
                   disabled={editUser.id === currentUserId}
                 >
-                  {Object.keys(roleInfo).map(role => (
-                    <option key={role} value={role}>
-                      {roleInfo[role as keyof typeof roleInfo]?.icon} {roleInfo[role as keyof typeof roleInfo]?.label || role}
-                    </option>
+                  {editableRoles.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
                   ))}
                 </select>
               </div>

@@ -88,7 +88,8 @@ const AdminCreateUserPage: React.FC<AdminCreateUserPageProps> = ({ onNavigate })
         const usersArray = result.data?.users || result.data?.data?.users || result.data || [];
         const mappedUsers: User[] = usersArray.map((user: ApiUser) => ({
           id: user._id,
-          username: user.name,
+          // Bug 5 fix: fallback firstName+lastName si name est vide
+          username: user.name || `${(user as any).firstName || ''} ${(user as any).lastName || ''}`.trim() || user.email,
           email: user.email,
           role: user.role,
           phone: user.phone,
@@ -213,13 +214,13 @@ const AdminCreateUserPage: React.FC<AdminCreateUserPageProps> = ({ onNavigate })
     if (!user) return;
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${userId}`, {
-        method: 'PUT',
+      // Bug 3 fix: utiliser le bon endpoint PATCH /admin/users/:id/toggle-status
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/users/${userId}/toggle-status`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
           'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ isActive: !user.isActive })
+        }
       });
 
       const result = await response.json();
