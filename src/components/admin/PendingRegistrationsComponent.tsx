@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { logger } from '@/components/utils/logger';
+import { apiClient } from '@/services/api';
 import { 
   Users, 
   Clock, 
@@ -62,19 +63,8 @@ const PendingRegistrationsComponent: React.FC<PendingRegistrationsComponentProps
   // Charger les données initiales
   const loadPendingRegistrations = useCallback(async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/pending-registrations`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPendingUsers(data.data || []);
-      } else {
-        throw new Error('Erreur lors du chargement des demandes');
-      }
+      const response = await apiClient.get('/admin/registrations');
+      setPendingUsers(response.data.data || []);
     } catch (error) {
       logger.error('Erreur lors du chargement des demandes d\'inscription', error);
       toast.error('Erreur lors du chargement des demandes d\'inscription');
@@ -83,17 +73,8 @@ const PendingRegistrationsComponent: React.FC<PendingRegistrationsComponentProps
 
   const loadRegistrationStats = useCallback(async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/registration-stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setStats(data.data);
-      }
+      const response = await apiClient.get('/admin/registration-stats');
+      setStats(response.data.data);
     } catch (error) {
       logger.error('Erreur lors du chargement des statistiques', error);
     } finally {
@@ -119,39 +100,26 @@ const PendingRegistrationsComponent: React.FC<PendingRegistrationsComponentProps
 
     setProcessing(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
       const endpoint = actionType === 'approve' 
-        ? `${API_URL}/admin/approve-registration/${selectedUser._id}`
-        : `${API_URL}/admin/reject-registration/${selectedUser._id}`;
+        ? `/admin/approve-registration/${selectedUser._id}`
+        : `/admin/reject-registration/${selectedUser._id}`;
 
       const body = actionType === 'approve' 
         ? { comments }
         : { reason: rejectionReason, comments };
 
-      const response = await fetch(endpoint, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      });
-
-      if (response.ok) {
-        toast.success(`Inscription ${actionType === 'approve' ? 'approuvée' : 'rejetée'} avec succès`);
-        
-        // Recharger les données
-        await Promise.all([
-          loadPendingRegistrations(),
-          loadRegistrationStats()
-        ]);
-        
-        setShowModal(false);
-        setSelectedUser(null);
-        setActionType(null);
-      } else {
-        throw new Error('Erreur lors de l\'action');
-      }
+      await apiClient.put(endpoint, body);
+      toast.success(`Inscription ${actionType === 'approve' ? 'approuvée' : 'rejetée'} avec succès`);
+      
+      // Recharger les données
+      await Promise.all([
+        loadPendingRegistrations(),
+        loadRegistrationStats()
+      ]);
+      
+      setShowModal(false);
+      setSelectedUser(null);
+      setActionType(null);
     } catch (error) {
       logger.error(`Erreur lors de l'${actionType === 'approve' ? 'approbation' : 'rejet'}`, error);
       toast.error(`Erreur lors de l'${actionType === 'approve' ? 'approbation' : 'rejet'}`);

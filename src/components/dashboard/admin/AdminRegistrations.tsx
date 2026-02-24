@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
-import axios from 'axios';
+import { apiClient } from '../../../services/api';
 
 interface Partner {
   _id?: string;
@@ -26,11 +26,9 @@ export const AdminRegistrations: React.FC<AdminRegistrationsProps> = ({ token })
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/pending-registrations`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined
-      });
+      const res = await apiClient.get('/admin/registrations');
       // Gère différents formats de réponse (tableau direct ou objet)
-      let arr = res.data;
+      let arr = res.data.data || res.data;
       if (arr && typeof arr === 'object' && !Array.isArray(arr)) {
         if (Array.isArray(arr.partners)) arr = arr.partners;
         else if (Array.isArray(arr.data)) arr = arr.data;

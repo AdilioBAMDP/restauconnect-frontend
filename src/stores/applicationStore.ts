@@ -80,10 +80,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await apiClient.post(
-        `${API_URL}/applications`,
-        data
-      );
+      await apiClient.post('/applications', data);
       
       set({ loading: false });
       

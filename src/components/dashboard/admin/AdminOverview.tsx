@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import AdminKpiCard from './AdminKpiCard';
 import ModerationStatsChart from './ModerationStatsChart';
 import { Users, ShoppingBag, TrendingUp, DollarSign, AlertCircle, CheckCircle, Clock, XCircle, RefreshCw } from 'lucide-react';
-import axios from 'axios';
+import { apiClient } from '../../../services/api';
 
 interface GlobalStats {
   totalUsers?: number;
@@ -65,17 +65,13 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
   const loadRealStats = async () => {
     setLoading(true);
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const headers = { Authorization: `Bearer ${localStorage.getItem('auth_token')}` };
-
-      // Charger toutes les stats en parallèle
-      const [usersRes, walletRes, offersRes, msgsRes, appsRes, regsRes] = await Promise.all([
-        axios.get(`${API_URL}/admin/users?page=1&limit=1000`, { headers }),
-        axios.get(`${API_URL}/admin/platform-wallet`, { headers }),
-        axios.get(`${API_URL}/admin/moderation/offers`, { headers }),
-        axios.get(`${API_URL}/admin/moderation/messages`, { headers }),
-        axios.get(`${API_URL}/applications`, { headers }),
-        axios.get(`${API_URL}/admin/pending-registrations`, { headers })
+      // Charger toutes les stats en parallèle via apiClient (token auto)
+      const [usersRes, walletRes, offersRes, msgsRes, regsRes] = await Promise.all([
+        apiClient.get('/admin/users?page=1&limit=1000'),
+        apiClient.get('/admin/platform-wallet'),
+        apiClient.get('/admin/moderation/offers'),
+        apiClient.get('/admin/moderation/messages'),
+        apiClient.get('/admin/registrations')
       ]);
 
       const users = usersRes.data.data?.users || [];
@@ -84,13 +80,13 @@ export const AdminOverview: React.FC<AdminOverviewProps> = ({
       setRealStats({
         totalUsers: users.length,
         activeUsers: users.filter((u: any) => u.isActive !== false).length,
-        pendingRegistrations: regsRes.data.data?.length || 0,
+        pendingRegistrations: regsRes.data.data?.filter((r: any) => r.status === 'pending').length || 0,
         totalOffers: offersRes.data.count || 0,
         activeOffers: offersRes.data.data?.filter((o: any) => o.status === 'active').length || 0,
-        monthlyRevenue: wallet?.monthlyRevenue || 0,
-        totalRevenue: wallet?.totalCommissionsCollected || 0,
+        monthlyRevenue: wallet?.monthlyVolume || wallet?.monthlyRevenue || 0,
+        totalRevenue: wallet?.totalVolume || wallet?.totalCommissionsCollected || 0,
         messages: msgsRes.data.count || 0,
-        applications: appsRes.data.applications?.length || 0
+        applications: regsRes.data.data?.length || 0
       });
     } catch (error) {
       console.error('Erreur chargement stats:', error);
