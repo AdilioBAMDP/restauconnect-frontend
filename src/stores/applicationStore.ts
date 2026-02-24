@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import axios from 'axios';
+﻿import { create } from 'zustand';
+import { apiClient } from '../services/api';
 import type { Application, ApplicationFormData, ApplicationStats, ApplicationsResponse, ApplicationStatus, ApplicationRole } from '../types/application';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -35,11 +35,8 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
       if (filters.role) params.append('role', filters.role);
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
-      const response = await axios.get<ApplicationsResponse>(
-        `${API_URL}/applications?${params.toString()}`,
-        {
-          headers: getAuthHeaders()
-        }
+      const response = await apiClient.get<ApplicationsResponse>(
+        `${API_URL}/applications?${params.toString()}`
       );
       
       set({ applications: response.data.applications, loading: false });
@@ -56,11 +53,8 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
   
   fetchStats: async () => {
     try {
-      const response = await axios.get<ApplicationStats>(
-        `${API_URL}/applications/stats`,
-        {
-          headers: getAuthHeaders()
-        }
+      const response = await apiClient.get<ApplicationStats>(
+        `${API_URL}/applications/stats`
       );
       
       set({ stats: response.data });
@@ -76,7 +70,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await axios.post(
+      await apiClient.post(
         `${API_URL}/applications`,
         data
       );
@@ -95,12 +89,9 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await axios.patch(
+      await apiClient.patch(
         `${API_URL}/applications/${id}/approve`,
-        { notes },
-        {
-          headers: getAuthHeaders()
-        }
+        { notes }
       );
       
       // Mettre à jour l'application dans la liste
@@ -127,12 +118,9 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await axios.patch(
+      await apiClient.patch(
         `${API_URL}/applications/${id}/reject`,
-        { notes },
-        {
-          headers: getAuthHeaders()
-        }
+        { notes }
       );
       
       // Mettre à jour l'application dans la liste
@@ -159,11 +147,8 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await axios.delete(
-        `${API_URL}/applications/${id}`,
-        {
-          headers: getAuthHeaders()
-        }
+      await apiClient.delete(
+        `${API_URL}/applications/${id}`
       );
       
       // Retirer l'application de la liste
