@@ -63,9 +63,15 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Compteur de 401 consécutifs sur routes protégées (détection token invalide)
+let consecutive401Count = 0;
+let logoutScheduled = false;
+
 // Intercepteur pour gérer les réponses et erreurs
 apiClient.interceptors.response.use(
   (response) => {
+    // Reset le compteur sur succès
+    consecutive401Count = 0;
     return response;
   },
   (error) => {
@@ -73,17 +79,37 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       const url = error.config?.url || '';
       
-      // Routes optionnelles qui peuvent échouer silencieusement (polling background)
-      const optionalRoutes = ['/marketplace/posts', '/marketplace/posts/ranked'];
+      // Routes qui ne nécessitent pas d'auth (peuvent échouer silencieusement)
+      const optionalRoutes = ['/marketplace/posts', '/marketplace/posts/ranked', '/auth/login', '/auth/register'];
       const isOptionalRoute = optionalRoutes.some(route => url.includes(route));
       
       if (!isOptionalRoute) {
-        // Seulement logger pour les routes importantes
-        logger.warn('API 401 - Route non implémentée ou token invalide', url);
+        consecutive401Count++;
+        logger.warn(`API 401 (${consecutive401Count}/3) - Token invalide ou expiré`, url);
+        
+        // Après 3 erreurs 401 consécutives sur routes protégées → token invalide
+        // Déconnecter l'utilisateur pour éviter la boucle infinie
+        if (consecutive401Count >= 3 && !logoutScheduled) {
+          logoutScheduled = true;
+          logger.warn('🔒 Token invalide détecté - Déconnexion automatique');
+          // Nettoyer le localStorage
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('token');
+          localStorage.removeItem('auth_user');
+          // Notifier l'application via un événement custom
+          window.dispatchEvent(new CustomEvent('auth:force-logout', { 
+            detail: { reason: 'Token invalide ou expiré - reconnectez-vous' } 
+          }));
+          // Rediriger après un court délai
+          setTimeout(() => {
+            consecutive401Count = 0;
+            logoutScheduled = false;
+            // Recharger la page pour réinitialiser l'état React
+            window.location.href = '/';
+          }, 1000);
+        }
       }
-      
-      // Ne PAS rediriger automatiquement ni supprimer tokens
-      // L'utilisateur peut être connecté, juste une API non implémentée
     }
     
     // ⚠️ IMPORTANT: Rejeter l'erreur complète pour préserver response.data.details
