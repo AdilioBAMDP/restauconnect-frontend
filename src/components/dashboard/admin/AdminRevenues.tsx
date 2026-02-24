@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, DollarSign, Calendar, Download, RefreshCw } from 'lucide-react';
-import axios from 'axios';
+import { apiClient } from '../../../services/api';
 
 interface PlatformWallet {
   balance: number;
@@ -32,14 +32,7 @@ export const AdminRevenues: React.FC<AdminRevenuesProps> = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/platform-wallet`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        }
-      );
+      const response = await apiClient.get('/admin/platform-wallet');
       
       if (response.data.success) {
         setWallet(response.data.data);

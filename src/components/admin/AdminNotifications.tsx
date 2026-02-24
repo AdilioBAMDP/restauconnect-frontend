@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Bell, X, AlertTriangle, Users, DollarSign, MessageSquare } from 'lucide-react';
 import { useBusinessStore } from '@/stores/businessStore';
-import { io } from 'socket.io-client';
 
 interface AdminNotification {
   id: string;
@@ -116,48 +115,8 @@ export default function AdminNotifications() {
     setLastCheck(now);
   }, [professionals, applications, messages, lastCheck]);
 
-  // Notifications temps réel (Socket.io)
-  useEffect(() => {
-    const socket = io();
-    socket.on('support:notify', ticket => {
-      setNotifications(n => [{
-        id: `support_${ticket._id}`,
-        type: 'system_alert',
-        title: 'Nouveau ticket support',
-        message: ticket.subject,
-        timestamp: new Date().toISOString(),
-        read: false,
-        priority: 'high'
-      }, ...n]);
-    });
-    socket.on('export:notify', info => {
-      setNotifications(n => [{
-        id: `export_${Date.now()}`,
-        type: 'system_alert',
-        title: 'Export terminé',
-        message: info.type,
-        timestamp: new Date().toISOString(),
-        read: false,
-        priority: 'medium'
-      }, ...n]);
-    });
-    socket.on('alert:notify', alertData => {
-      setNotifications(n => [{
-        id: `alert_${Date.now()}`,
-        type: 'system_alert',
-        title: 'Alerte critique',
-        message: alertData.message,
-        timestamp: new Date().toISOString(),
-        read: false,
-        priority: 'high'
-      }, ...n]);
-    });
-    return () => {
-      socket.off('support:notify');
-      socket.off('export:notify');
-      socket.off('alert:notify');
-    };
-  }, []);
+  // Socket.IO désactivé — le backend Railway ne supporte pas Socket.IO
+  // Les notifications se basent sur les données du store en temps réel
 
   const unreadCount = notifications.filter(notif => !notif.read).length;
 

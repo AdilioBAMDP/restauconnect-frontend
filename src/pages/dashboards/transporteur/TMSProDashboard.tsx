@@ -144,9 +144,16 @@ const TMSProDashboard: React.FC<TMSProDashboardProps> = ({ onNavigate }) => {
   useEffect(() => {
     const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:5000', {
       transports: ['websocket'],
+      reconnection: false,   // Ne pas retenter si le serveur ne supporte pas Socket.IO
+      timeout: 5000,
       auth: {
         token: localStorage.getItem('authToken')
       }
+    });
+
+    socketInstance.on('connect_error', () => {
+      // Tracking temps réel non disponible - silence
+      socketInstance.disconnect();
     });
 
     socketInstance.on('connect', () => {

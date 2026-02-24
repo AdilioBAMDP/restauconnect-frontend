@@ -112,9 +112,15 @@ const LiveTrackingMap: React.FC = () => {
   useEffect(() => {
     const socketInstance = io(import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000', {
       transports: ['websocket'],
+      reconnection: false,
+      timeout: 5000,
       auth: {
         token: localStorage.getItem('token')
       }
+    });
+
+    socketInstance.on('connect_error', () => {
+      socketInstance.disconnect();
     });
 
     socketInstance.on('connect', () => {
