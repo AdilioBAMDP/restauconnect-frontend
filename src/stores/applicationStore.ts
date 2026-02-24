@@ -1,6 +1,6 @@
 ﻿import { create } from 'zustand';
 import { apiClient } from '../services/api';
-import type { Application, ApplicationFormData, ApplicationStats, ApplicationsResponse, ApplicationStatus, ApplicationRole } from '../types/application';
+import type { Application, ApplicationFormData, ApplicationStats, ApplicationStatus, ApplicationRole } from '../types/application';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -35,11 +35,12 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
       if (filters.role) params.append('role', filters.role);
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
-      const response = await apiClient.get<ApplicationsResponse>(
-        `${API_URL}/applications?${params.toString()}`
+      // Appel vers /admin/registrations qui retourne les vrais User en attente d'approbation
+      const response = await apiClient.get(
+        `${API_URL}/admin/registrations?${params.toString()}`
       );
       
-      set({ applications: response.data.applications, loading: false });
+      set({ applications: response.data.applications || [], loading: false });
       
     } catch (error) {
       console.error('❌ Erreur fetchApplications:', error);
@@ -53,11 +54,20 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
   
   fetchStats: async () => {
     try {
-      const response = await apiClient.get<ApplicationStats>(
-        `${API_URL}/applications/stats`
+      // registration-stats retourne { success, data: { pending, approved, rejected, total } }
+      const response = await apiClient.get(
+        `${API_URL}/admin/registration-stats`
       );
-      
-      set({ stats: response.data });
+      const raw = response.data.data || response.data;
+      set({
+        stats: {
+          total: raw.total || 0,
+          pending: raw.pending || 0,
+          approved: raw.approved || 0,
+          rejected: raw.rejected || 0,
+          byRole: raw.byRole || {},
+        }
+      });
       
     } catch (error) {
       console.error('❌ Erreur fetchStats:', error);
@@ -89,9 +99,9 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await apiClient.patch(
-        `${API_URL}/applications/${id}/approve`,
-        { notes }
+      await apiClient.put(
+        `${API_URL}/admin/approve-registration/${id}`,
+        { comments: notes }
       );
       
       // Mettre à jour l'application dans la liste
@@ -118,9 +128,9 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      await apiClient.patch(
-        `${API_URL}/applications/${id}/reject`,
-        { notes }
+      await apiClient.put(
+        `${API_URL}/admin/reject-registration/${id}`,
+        { reason: notes }
       );
       
       // Mettre à jour l'application dans la liste
@@ -148,7 +158,7 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     
     try {
       await apiClient.delete(
-        `${API_URL}/applications/${id}`
+        `${API_URL}/admin/users/${id}`
       );
       
       // Retirer l'application de la liste
