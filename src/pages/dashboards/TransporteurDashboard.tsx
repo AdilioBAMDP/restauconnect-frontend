@@ -70,7 +70,7 @@ const TransporteurDashboard: React.FC = () => {
       const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken') || localStorage.getItem('token');
       
       // Charger les stats TMS
-      const statsResponse = await axios.get('http://localhost:5000/api/transporteur-tms/stats', {
+      const statsResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/transporteur-tms/stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, CreditCard, Users, Eye, Download } from 'lucide-react';
+import { apiClient } from '../../../services/api';
 
 interface GlobalStats {
   totalUsers: number;
@@ -32,13 +33,8 @@ export const AdminTransactions: React.FC<AdminTransactionsProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/transactions`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const result = await response.json();
+        const response = await apiClient.get('/admin/transactions');
+        const result = response.data;
         if (result.success && Array.isArray(result.data)) {
           setTransactions(result.data);
         } else {
@@ -54,9 +50,9 @@ export const AdminTransactions: React.FC<AdminTransactionsProps> = ({
   }, []);
 
   const filteredTransactions = transactions.filter(transaction => {
-    const matchesSearch = transaction.from.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.to.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         transaction.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (transaction.from?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (transaction.to?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         String(transaction.id || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || transaction.status === filterStatus;
     const matchesType = filterType === 'all' || transaction.type === filterType;
     
@@ -309,18 +305,11 @@ export const AdminTransactions: React.FC<AdminTransactionsProps> = ({
                         onClick={async () => {
                           if (!window.confirm('Valider cette transaction ?')) return;
                           try {
-                            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/wallet/transactions/${transaction.id}/validate`, {
-                              method: 'PATCH',
-                              headers: {
-                                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-                                'Content-Type': 'application/json'
-                              }
-                            });
-                            const result = await response.json();
-                            if (result.success) {
+                            const response = await apiClient.patch(`/wallet/transactions/${transaction.id}/validate`);
+                            if (response.data.success) {
                               setTransactions(prev => prev.map(t => t.id === transaction.id ? { ...t, status: 'completed' } : t));
                             } else {
-                              alert(result.error || 'Erreur lors de la validation');
+                              alert(response.data.error || 'Erreur lors de la validation');
                             }
                           } catch (err) {
                             alert('Erreur lors de la validation');
@@ -337,18 +326,11 @@ export const AdminTransactions: React.FC<AdminTransactionsProps> = ({
                       onClick={async () => {
                         if (!window.confirm('Supprimer cette transaction ?')) return;
                         try {
-                          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/wallet/transactions/${transaction.id}`, {
-                            method: 'DELETE',
-                            headers: {
-                              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-                              'Content-Type': 'application/json'
-                            }
-                          });
-                          const result = await response.json();
-                          if (result.success) {
+                          const response = await apiClient.delete(`/wallet/transactions/${transaction.id}`);
+                          if (response.data.success) {
                             setTransactions(prev => prev.filter(t => t.id !== transaction.id));
                           } else {
-                            alert(result.error || 'Erreur lors de la suppression');
+                            alert(response.data.error || 'Erreur lors de la suppression');
                           }
                         } catch (err) {
                           alert('Erreur lors de la suppression');

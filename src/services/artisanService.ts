@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { Quote, QuoteFormData, InvoiceFormData, ArtisanStats } from '@/types/artisan.types';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Configuration axios avec token d'authentification
 const apiClient = axios.create({

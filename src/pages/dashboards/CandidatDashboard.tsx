@@ -71,7 +71,7 @@ const CandidatDashboard: React.FC = () => {
         }
 
         // Charger les candidatures du candidat
-        const applicationsResponse = await axios.get('http://localhost:5000/api/candidat/applications', {
+        const applicationsResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/candidat/applications`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
