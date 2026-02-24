@@ -140,12 +140,9 @@ export const useOfferStore = create<OfferState>((set, get) => ({
         ...currentFilters
       };
       
-      const token = localStorage.getItem('authToken');
       const response = await axios.get(`${API_URL}/offers`, {
         params,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       set({
@@ -170,11 +167,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       const response = await axios.get(`${API_URL}/offers/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       set({
@@ -196,12 +190,9 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       const response = await axios.get(`${API_URL}/offers`, {
         params: { myOffers: true },
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       set({
@@ -224,11 +215,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       const response = await axios.post(`${API_URL}/offers`, offerData, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       // Ajouter l'offre à la liste
@@ -255,11 +243,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       const response = await axios.patch(`${API_URL}/offers/${id}`, offerData, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       // Mettre à jour dans la liste
@@ -288,11 +273,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       await axios.delete(`${API_URL}/offers/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       // Retirer de la liste
@@ -320,11 +302,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       await axios.post(`${API_URL}/offers/${id}/close`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       // Mettre à jour le statut
@@ -355,13 +334,10 @@ export const useOfferStore = create<OfferState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const token = localStorage.getItem('authToken');
       const response = await axios.post(`${API_URL}/offers/${offerId}/respond`, 
         { message },
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         }
       );
       
@@ -388,11 +364,8 @@ export const useOfferStore = create<OfferState>((set, get) => ({
   // Incrémenter le compteur de vues
   viewOffer: async (offerId: string) => {
     try {
-      const token = localStorage.getItem('authToken');
       await axios.post(`${API_URL}/offers/${offerId}/view`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       // Mettre à jour localement (optionnel)

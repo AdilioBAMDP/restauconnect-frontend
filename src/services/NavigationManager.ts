@@ -46,7 +46,8 @@ export type PageName =
   | 'partenaires-comptable' | 'partenaires-investisseur' | 'partenaires-auditeur'
   | 'partenaires-demandeur-emploi' | 'artisan-pro'
   | 'transporteur-fleet' | 'transporteur-drivers' | 'transporteur-deliveries'
-  | 'transporteur-documents' | 'transporteur-analytics' | 'transporteur-maintenance';
+  | 'transporteur-documents' | 'transporteur-analytics' | 'transporteur-maintenance'
+  | 'reset-password' | 'partenaires-candidat';
 
 // Options de navigation
 export interface NavigationOptions {
@@ -400,6 +401,7 @@ class NavigationManagerClass {
       '/partners/auditor': 'partenaires-auditeur',
       '/partners/job-seeker': 'partenaires-demandeur-emploi',
       '/partners/candidat': 'partenaires-candidat',
+      '/reset-password': 'reset-password',
     };
     
     // Chercher dans le mapping inverse d'abord

@@ -186,52 +186,40 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         unreadCount: Math.max(0, state.unreadCount - 1)
       }));
       
-      return true;
-      
-    } catch (error: unknown) {
-      console.error('❌ Erreur mark as read:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      set({
-        error: err.response?.data?.message || 'Erreur lors du marquage comme lu'
-      });
-      return false;
-    }
-  },
-  
-  // Marquer toutes les notifications comme lues
-  markAllAsRead: async () => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      const token = localStorage.getItem('authToken');
-      await axios.post(`${API_URL}/notifications/mark-all-read`, {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      
-      // Mettre à jour localement
-      set((state) => ({
-        notifications: state.notifications.map(n => ({ 
-          ...n, 
+      try {
+        set({ isLoading: true, error: null });
+        const params = unreadOnly ? { unread: true } : {};
+        const response = await axios.get(`${API_URL}/notifications`, {
+          params,
+          headers: getAuthHeaders()
+        });
+        set({
+          notifications: response.data.notifications,
+          isLoading: false
+        });
+        // Mettre à jour le compteur
+        get().getUnreadCount();
+      } catch (error: unknown) {
+        console.error('❌ Erreur fetch notifications:', error);
+        const err = error as { response?: { data?: { message?: string } } };
+        set({
+          error: err.response?.data?.message || 'Erreur lors du chargement des notifications',
+          isLoading: false
+        });
+      }
           read: true, 
           readAt: new Date().toISOString() 
-        })),
-        unreadCount: 0,
-        isLoading: false
-      }));
-      
-      return true;
-      
-    } catch (error: unknown) {
-      console.error('❌ Erreur mark all as read:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      set({
-        error: err.response?.data?.message || 'Erreur lors du marquage comme lu',
-        isLoading: false
-      });
-      return false;
-    }
+        try {
+          const response = await axios.get(`${API_URL}/notifications/unread/count`, {
+            headers: getAuthHeaders()
+          });
+          set({
+            unreadCount: response.data.count
+          });
+        } catch (error: unknown) {
+          console.error('❌ Erreur unread count:', error);
+          // Ne pas afficher d'erreur à l'utilisateur
+        }
   },
   
   // Archiver une notification
@@ -249,33 +237,27 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         notifications: state.notifications.filter(n => n._id !== notificationId)
       }));
       
-      return true;
-      
-    } catch (error: unknown) {
-      console.error('❌ Erreur archive notification:', error);
-      const err = error as { response?: { data?: { message?: string } } };
-      set({
-        error: err.response?.data?.message || 'Erreur lors de l\'archivage'
-      });
-      return false;
-    }
-  },
-  
-  // Supprimer une notification
-  deleteNotification: async (notificationId: string) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      await axios.delete(`${API_URL}/notifications/${notificationId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      
-      // Retirer de la liste
-      set((state) => {
-        const notification = state.notifications.find(n => n._id === notificationId);
-        const wasUnread = notification && !notification.read;
-        
+      try {
+        await axios.patch(`${API_URL}/notifications/${notificationId}/read`, {}, {
+          headers: getAuthHeaders()
+        });
+        set((state) => {
+          const notification = state.notifications.find(n => n._id === notificationId);
+          const wasUnread = notification && !notification.read;
+          return {
+            notifications: state.notifications.filter(n => n._id !== notificationId),
+            unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount
+          };
+        });
+        return true;
+      } catch (error: unknown) {
+        console.error('❌ Erreur mark notification as read:', error);
+        const err = error as { response?: { data?: { message?: string } } };
+        set({
+          error: err.response?.data?.message || 'Erreur lors du marquage comme lu'
+        });
+        return false;
+      }
         return {
           notifications: state.notifications.filter(n => n._id !== notificationId),
           unreadCount: wasUnread ? Math.max(0, state.unreadCount - 1) : state.unreadCount

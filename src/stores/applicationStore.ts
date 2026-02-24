@@ -30,20 +30,15 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-      
       const params = new URLSearchParams();
       if (filters.status) params.append('status', filters.status);
       if (filters.role) params.append('role', filters.role);
       if (filters.page) params.append('page', filters.page.toString());
       if (filters.limit) params.append('limit', filters.limit.toString());
-      
       const response = await axios.get<ApplicationsResponse>(
         `${API_URL}/applications?${params.toString()}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         }
       );
       
@@ -61,14 +56,10 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
   
   fetchStats: async () => {
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-      
       const response = await axios.get<ApplicationStats>(
         `${API_URL}/applications/stats`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         }
       );
       
@@ -104,15 +95,11 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-      
       await axios.patch(
         `${API_URL}/applications/${id}/approve`,
         { notes },
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         }
       );
       
@@ -140,15 +127,11 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-      
       await axios.patch(
         `${API_URL}/applications/${id}/reject`,
         { notes },
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         }
       );
       
@@ -176,14 +159,10 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      const token = localStorage.getItem('auth_token') || localStorage.getItem('authToken');
-      
       await axios.delete(
         `${API_URL}/applications/${id}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: getAuthHeaders()
         }
       );
       

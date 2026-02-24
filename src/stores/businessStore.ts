@@ -2423,16 +2423,15 @@ export const useBusinessStore = create<BusinessState>()(
           set((state) => ({
             globalAnnouncements: state.globalAnnouncements.map((ann) =>
               ann.id === id 
-                ? {
-                    ...ann,
-                    status: 'active',
-                    lastConfirmedAt: now.toISOString(),
-                    nextConfirmationDue: new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString()
-                  }
-                : ann
-            )
-          }));
-        } else {
+                try {
+                  const headers = getAuthHeaders();
+                  console.log(' [fetchAnnouncements] Token pr e9sent:', !!headers.Authorization);
+                  const response = await fetch(`${API_BASE_URL}/announcements`, {
+                    headers: {
+                      ...headers,
+                      'Content-Type': 'application/json'
+                    }
+                  });
           // Supprimer l'annonce car elle n'est plus d'actualitÃ©
           set((state) => ({
             globalAnnouncements: state.globalAnnouncements.filter((ann) => ann.id !== id)

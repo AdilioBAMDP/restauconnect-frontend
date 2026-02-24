@@ -72,6 +72,7 @@ import FloatingPublishButton from './components/offers/FloatingPublishButton';
 import OrdersPage from './pages/orders/List';
 import PartnersListPage from './pages/misc/Partners';
 import PartenairesCandidatPage from './pages/PartenairesCandidatPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import { useAppStore } from './stores/appStore';
 
 // Composant interne qui utilise le contexte d'authentification
@@ -213,6 +214,11 @@ function AppContent() {
   }, [isLoading, isAuthenticated, showAuthModal, currentPage]);
 
   const renderPage = () => {
+    // Détection directe de l'URL pour la page de réinitialisation de mot de passe
+    if (window.location.pathname.includes('reset-password') && window.location.search.includes('token=')) {
+      return <ResetPasswordPage />;
+    }
+
     switch (currentPage) {
       case 'admin-platform-settings':
         return <React.Suspense fallback={<div>Chargement…</div>}>
@@ -463,7 +469,11 @@ function AppContent() {
         // ✅ NOUVEAU SYSTÈME ARTISAN DEVIS/FACTURES
         case 'artisan-pro':
           return <ArtisanDashboardUnified />;
-        
+
+        // ✅ Réinitialisation mot de passe
+        case 'reset-password':
+          return <ResetPasswordPage />;
+
       default:
         // Log pour debug - identifier les tentatives de navigation vers des pages inconnues
         if (currentPage && currentPage !== ('home' as PageName)) {

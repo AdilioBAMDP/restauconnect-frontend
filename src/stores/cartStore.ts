@@ -79,11 +79,12 @@ export const useCartStore = create<CartStore>()(
       getTotalItems: () => {
         return get().items.reduce((total, item) => total + item.quantity, 0);
       },
-
-      getSubtotal: () => {
-        return get().items.reduce((total, item) => total + (item.price * item.quantity), 0);
-      },
-
+                  // Use getAuthHeaders to retrieve the token
+                  const headers = getAuthHeaders();
+                  if (!headers.Authorization) {
+                    console.warn('⚠️ Pas de token d\'authentification - ajout local seulement');
+                    return;
+                  }
       getDeliveryFee: () => {
         const { supplier, urgency } = get();
         const baseFee = supplier?.deliveryFee || 0;
