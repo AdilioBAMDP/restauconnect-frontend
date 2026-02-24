@@ -28,8 +28,15 @@ export const useMessageNotifications = (isAuthenticated: boolean, userId?: strin
         token: localStorage.getItem('auth_token')
       },
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5
+      reconnectionDelay: 3000,
+      reconnectionAttempts: 3,
+      timeout: 5000
+    });
+
+    // Événement: Erreur de connexion (silencieux pour éviter le spam)
+    socket.on('connect_error', () => {
+      // Socket.IO non disponible sur ce backend, on arrête les tentatives
+      socket?.disconnect();
     });
 
     // Événement: Connexion établie
